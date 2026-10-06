@@ -1,0 +1,134 @@
+:root {
+  --paper: #EFEFEA;
+  --ink: #232722;
+  --moss: #4C6A4F;
+  --stone: #646860;
+  --edge: #DBDBD3;
+  --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Charter, Georgia, serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #1C201B;
+    --ink: #E6E7E1;
+    --moss: #9BBE9C;
+    --stone: #91958C;
+    --edge: #33382F;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 3rem 1.75rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+}
+
+main, footer {
+  width: 100%;
+  max-width: 34rem;
+  margin-inline: auto;
+}
+
+.domain {
+  display: inline-block;
+  margin: 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--moss);
+  font-family: var(--mono);
+  font-size: clamp(1.75rem, 7vw, 2.75rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.name { margin: 2.25rem 0 0; font-weight: 600; }
+
+.title { margin: 0 0 1.25rem; color: var(--stone); }
+
+.bio { margin: 0 0 2.5rem; }
+
+.records {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.55rem 1.25rem;
+  align-items: baseline;
+  margin: 0 0 3rem;
+}
+
+.records dt {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  color: var(--stone);
+}
+
+.records dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.request h2 {
+  margin: 0 0 1rem;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--stone);
+}
+
+.trace dd { font-size: 0.8125rem; }
+
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--moss);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+a:hover { text-decoration-thickness: 2px; }
+
+a:focus-visible {
+  outline: 2px solid var(--moss);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.note {
+  margin: 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--edge);
+  font-size: 0.9375rem;
+  font-style: italic;
+  color: var(--stone);
+}
+
+footer {
+  margin-top: 2rem;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  color: var(--stone);
+}
+
+footer code { font-family: inherit; }
+
+@media (max-width: 34rem) {
+  body { padding: 2rem 1.25rem; }
+  .records { grid-template-columns: 1fr; gap: 0.15rem; }
+  .records dd { margin-bottom: 0.9rem; }
+}
