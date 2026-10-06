@@ -93,6 +93,8 @@ func New(o Options) (http.Handler, error) {
 	apex.HandleFunc("/.well-known/security.txt", func(w http.ResponseWriter, r *http.Request) {
 		text(w, http.StatusOK, s.security, "public, max-age=86400")
 	})
+	apex.HandleFunc("/{$}", s.index)
+	apex.HandleFunc("/trace", s.traceJSON)
 	apex.HandleFunc("/", s.notFound)
 
 	var h http.Handler = s.route(apex)
