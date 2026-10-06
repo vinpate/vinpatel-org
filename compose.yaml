@@ -1,0 +1,41 @@
+name: vinpatel-org
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 64
+  restart: unless-stopped
+  networks: [edge]
+
+services:
+  web:
+    <<: *hardening
+    image: ghcr.io/vinpate/vinpatel-org:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-local}
+        BUILD_TIME: ${BUILD_TIME:-}
+    user: "65534:65534"
+    mem_limit: 64m
+    environment:
+      SITE_HOST: vinpatel.org
+      MTA_STS_MODE: testing
+      MTA_STS_MX: mx01.mail.icloud.com,mx02.mail.icloud.com
+      MTA_STS_MAX_AGE: "604800"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+  cloudflared:
+    <<: *hardening
+    image: cloudflare/cloudflared:2026.10.0@sha256:9b49eed8f62806d5d45ddf59ecefb5710429598ea6d3fcccd2af938f621b2b07
+    command: ["tunnel", "--no-autoupdate", "run"]
+    mem_limit: 128m
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?TUNNEL_TOKEN is unset; run op inject -i .env.tpl -o .env}
+    depends_on:
+      web:
+        condition: service_healthy
+
+networks:
+  edge: {}
