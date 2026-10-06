@@ -39,6 +39,9 @@ visitor ─HTTPS─▶ Cloudflare edge ─▶ fallback Worker ─▶ Tunnel ─�
 | `edge/fallback.js` | the Worker that serves the offline card |
 | `infra/` | tunnel, DNS, transform and redirect rules, zone settings, Worker |
 | `compose.yaml` | `web` and `cloudflared` |
+| `Dockerfile` | two-stage build to a `scratch` image |
+| `scripts/` | the image smoke test and the tunnel token helper |
+| `.github/` | the CI workflow and Dependabot |
 
 ## Develop
 
@@ -50,6 +53,23 @@ SITE_HOST=localhost DOH_URL= go run ./cmd/server    # then open http://localhost
 ```
 
 `scripts/smoke.sh IMAGE` checks a built image the way CI does.
+
+## Deploy
+
+Secrets never live in the repository. The `op://` references in
+`infra/op.env` and `.env.tpl` point at items in a 1Password vault, and the
+1Password CLI fills them in at run time.
+
+```sh
+op run --env-file infra/op.env -- terraform -chdir=infra apply   # tunnel, DNS, rules, Worker
+op run --env-file infra/op.env -- scripts/tunnel-token.sh        # store the tunnel's connector token
+op inject -i .env.tpl -o .env                                    # render the environment file
+docker compose up -d                                             # start web and cloudflared
+```
+
+The host needs Docker, the 1Password CLI and, for the first two commands,
+Terraform. Every merge to `main` publishes a new image; set `IMAGE_TAG`
+in `.env` to pin one.
 
 ## Configuration
 

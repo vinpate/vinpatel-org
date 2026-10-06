@@ -25,6 +25,7 @@ services:
       MTA_STS_MX: mx01.mail.icloud.com,mx02.mail.icloud.com
       MTA_STS_MAX_AGE: "604800"
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      GOMEMLIMIT: 48MiB # keeps the Go heap well under mem_limit
 
   cloudflared:
     <<: *hardening

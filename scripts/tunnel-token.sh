@@ -30,6 +30,6 @@ if [ "${1:-}" = rotate ]; then
 fi
 
 response=$(call "$api/token")
-token=$(printf '%s' "$response" | python3 -c 'import json, sys; print(json.load(sys.stdin)["result"])')
+token=$(printf '%s' "$response" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).result)')
 op item edit tunnel-token --vault vinpatel-org "credential=$token" >/dev/null
 echo "tunnel-token updated for tunnel $tunnel_id"

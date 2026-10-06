@@ -29,8 +29,9 @@ func securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// ipHeaders are deleted before any handler runs. The edge already strips
-// them; this keeps the origin anonymous if that edge setting ever changes.
+// ipHeaders are deleted before any handler runs. Cloudflare's managed
+// transform removes them at the edge, but the fallback Worker's request to
+// the origin adds them back, so the origin cannot rely on the edge for this.
 var ipHeaders = []string{
 	"CF-Connecting-IP", "CF-Connecting-IPv6", "CF-Pseudo-IPv4",
 	"True-Client-IP", "X-Forwarded-For", "X-Real-IP", "Forwarded",
@@ -101,6 +102,9 @@ func logRequests(log *slog.Logger, next http.Handler) http.Handler {
 		}
 		rec := &recorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
+		if r.Method == http.MethodHead {
+			rec.bytes = 0 // the server discards the body, so none went out
+		}
 		log.Info("request",
 			"host", r.Host,
 			"method", r.Method,

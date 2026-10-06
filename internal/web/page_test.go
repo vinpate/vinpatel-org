@@ -2,7 +2,6 @@ package web
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -24,11 +23,6 @@ var edgeHeaders = http.Header{
 	"Cf-Ipcity":    {"San Jose"},
 	"Cf-Ipcountry": {"US"},
 }
-
-type staticLookup struct{ dmarc, org string }
-
-func (l staticLookup) DMARCPolicy(context.Context, string) (string, time.Duration) { return l.dmarc, 0 }
-func (l staticLookup) ASOrg(context.Context, uint32) string                        { return l.org }
 
 var originLine = regexp.MustCompile(`<p class="origin">origin \d+\.\d\d ms(?: · dmarc [a-z0-9 ]+)? · ` + regexp.QuoteMeta(runtime.Version()) + ` · \d+ goroutines · \d+\.\d MB heap</p>`)
 
@@ -94,7 +88,7 @@ func TestIndexWithoutEdgeHeaders(t *testing.T) {
 
 func TestLookupMissesOmitParts(t *testing.T) {
 	o := testOptions(t)
-	o.Lookup = staticLookup{}
+	o.Lookup = fakeLookup{}
 	body := serve(newHandler(t, o), http.MethodGet, "vinpatel.org", "/", edgeHeaders).Body.String()
 	for _, want := range []string{
 		"<dt>from</dt><dd>AS13335 · San Jose, US</dd>",
@@ -111,7 +105,7 @@ func TestLookupMissesOmitParts(t *testing.T) {
 
 func TestFreshDMARCAnswerReadsAsJustNow(t *testing.T) {
 	o := testOptions(t)
-	o.Lookup = staticLookup{dmarc: "reject"}
+	o.Lookup = fakeLookup{dmarc: "reject"}
 	body := serve(newHandler(t, o), http.MethodGet, "vinpatel.org", "/", nil).Body.String()
 	if !strings.Contains(body, " · dmarc fetched just now · ") {
 		t.Errorf("page lacks a just-now dmarc note:\n%s", body)
@@ -120,7 +114,7 @@ func TestFreshDMARCAnswerReadsAsJustNow(t *testing.T) {
 
 func TestIndexEscapesEdgeValues(t *testing.T) {
 	o := testOptions(t)
-	o.Lookup = staticLookup{org: `<img src=x onerror=alert(1)>`}
+	o.Lookup = fakeLookup{org: `<img src=x onerror=alert(1)>`}
 	h := http.Header{"Cf-Ipcity": {"<script>alert(1)</script>"}, "X-Edge-Asn": {"64500"}}
 	body := serve(newHandler(t, o), http.MethodGet, "vinpatel.org", "/", h).Body.String()
 	if strings.Contains(body, "<script>") || strings.Contains(body, "<img") {

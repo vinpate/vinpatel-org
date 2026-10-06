@@ -25,8 +25,6 @@ import (
 //go:embed templates static
 var content embed.FS
 
-const contact = "mailto:mail@vinpatel.org"
-
 // Lookup is the DNS knowledge the page needs; *resolve.Resolver satisfies it.
 type Lookup interface {
 	// DMARCPolicy returns the p= value of the domain's DMARC record and how
@@ -160,7 +158,7 @@ func securityTXT(host string, built time.Time) string {
 		built = time.Now()
 	}
 	expires := built.UTC().AddDate(0, 0, 364).Truncate(time.Second)
-	return "Contact: " + contact + "\n" +
+	return "Contact: mailto:mail@" + host + "\n" +
 		"Expires: " + expires.Format(time.RFC3339) + "\n" +
 		"Preferred-Languages: en\n" +
 		"Canonical: https://" + host + "/.well-known/security.txt\n"

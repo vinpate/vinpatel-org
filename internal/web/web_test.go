@@ -16,21 +16,26 @@ import (
 
 var testBuild = time.Date(2026, 10, 5, 20, 0, 0, 0, time.UTC)
 
-// fakeLookup answers only for the inputs a correct handler asks about.
-type fakeLookup struct{}
-
-func (fakeLookup) DMARCPolicy(_ context.Context, domain string) (string, time.Duration) {
-	if domain == "vinpatel.org" {
-		return "reject", 14 * time.Minute
-	}
-	return "", 0
+// fakeLookup answers only for the site's own domain and the ASN in
+// edgeHeaders, so a handler that asks about the wrong input gets nothing.
+type fakeLookup struct {
+	dmarc string
+	age   time.Duration
+	org   string
 }
 
-func (fakeLookup) ASOrg(_ context.Context, asn uint32) string {
-	if asn == 13335 {
-		return "CLOUDFLARENET - Cloudflare, Inc., US"
+func (l fakeLookup) DMARCPolicy(_ context.Context, domain string) (string, time.Duration) {
+	if domain != "vinpatel.org" {
+		return "", 0
 	}
-	return ""
+	return l.dmarc, l.age
+}
+
+func (l fakeLookup) ASOrg(_ context.Context, asn uint32) string {
+	if asn != 13335 {
+		return ""
+	}
+	return l.org
 }
 
 func testOptions(t *testing.T) Options {
@@ -43,7 +48,7 @@ func testOptions(t *testing.T) Options {
 		Config:    cfg,
 		Version:   "abc1234",
 		BuildTime: testBuild,
-		Lookup:    fakeLookup{},
+		Lookup:    fakeLookup{dmarc: "reject", age: 14 * time.Minute, org: "CLOUDFLARENET - Cloudflare, Inc., US"},
 		Logger:    slog.New(slog.DiscardHandler),
 	}
 }
@@ -300,5 +305,38 @@ func TestHealthChecksAreNotLogged(t *testing.T) {
 	serve(newHandler(t, o), http.MethodGet, "127.0.0.1:8080", "/healthz", nil)
 	if buf.Len() != 0 {
 		t.Errorf("healthcheck was logged: %s", buf.String())
+	}
+}
+
+func TestPageIdentityFollowsSiteHost(t *testing.T) {
+	o := testOptions(t)
+	o.Config.SiteHost = "example.org"
+	h := newHandler(t, o)
+	page := serve(h, http.MethodGet, "example.org", "/", edgeHeaders).Body.String()
+	for _, want := range []string{
+		`<a href="mailto:mail@example.org">mail@example.org</a>`,
+		"Reach me at mail@example.org.",
+		"Anything claiming to be from example.org",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("page lacks %q", want)
+		}
+	}
+	if strings.Contains(page, "vinpatel.org") {
+		t.Errorf("page still names vinpatel.org:\n%s", page)
+	}
+	security := serve(h, http.MethodGet, "example.org", "/.well-known/security.txt", nil).Body.String()
+	if !strings.Contains(security, "Contact: mailto:mail@example.org\n") {
+		t.Errorf("security.txt = %q", security)
+	}
+}
+
+func TestLogsZeroBytesForHEAD(t *testing.T) {
+	var buf bytes.Buffer
+	o := testOptions(t)
+	o.Logger = slog.New(slog.NewJSONHandler(&buf, nil))
+	serve(newHandler(t, o), http.MethodHead, "vinpatel.org", "/robots.txt", nil)
+	if !strings.Contains(buf.String(), `"bytes":0`) {
+		t.Errorf("HEAD should log zero body bytes:\n%s", buf.String())
 	}
 }

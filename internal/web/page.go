@@ -203,5 +203,5 @@ func prefix(p, v string) string {
 }
 
 func serverTiming(d time.Duration) string {
-	return fmt.Sprintf("origin;dur=%.2f", float64(d.Microseconds())/1000)
+	return fmt.Sprintf("origin;dur=%.2f", millis(d))
 }

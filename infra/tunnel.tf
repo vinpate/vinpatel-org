@@ -6,6 +6,12 @@ resource "cloudflare_zero_trust_tunnel_cloudflared" "web" {
   account_id = var.account_id
   name       = "vinpatel-org-web"
   config_src = "cloudflare"
+
+  # Every hostname points at this tunnel's ID and Cloudflare refuses to
+  # delete a tunnel with live connections, so a replace must fail at plan time.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "cloudflare_zero_trust_tunnel_cloudflared_config" "web" {
