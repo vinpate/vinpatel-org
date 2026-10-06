@@ -19,11 +19,11 @@ var testBuild = time.Date(2026, 10, 5, 20, 0, 0, 0, time.UTC)
 // fakeLookup answers only for the inputs a correct handler asks about.
 type fakeLookup struct{}
 
-func (fakeLookup) DMARCPolicy(_ context.Context, domain string) string {
+func (fakeLookup) DMARCPolicy(_ context.Context, domain string) (string, time.Duration) {
 	if domain == "vinpatel.org" {
-		return "reject"
+		return "reject", 14 * time.Minute
 	}
-	return ""
+	return "", 0
 }
 
 func (fakeLookup) ASOrg(_ context.Context, asn uint32) string {

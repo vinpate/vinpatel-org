@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -26,8 +27,10 @@ var edgeHeaders = http.Header{
 
 type staticLookup struct{ dmarc, org string }
 
-func (l staticLookup) DMARCPolicy(context.Context, string) string { return l.dmarc }
-func (l staticLookup) ASOrg(context.Context, uint32) string       { return l.org }
+func (l staticLookup) DMARCPolicy(context.Context, string) (string, time.Duration) { return l.dmarc, 0 }
+func (l staticLookup) ASOrg(context.Context, uint32) string                        { return l.org }
+
+var originLine = regexp.MustCompile(`<p class="origin">origin \d+\.\d\d ms(?: · dmarc [a-z0-9 ]+)? · ` + regexp.QuoteMeta(runtime.Version()) + ` · \d+ goroutines · \d+\.\d MB heap</p>`)
 
 func TestIndexReflectsTheRequest(t *testing.T) {
 	rec := serve(newHandler(t, testOptions(t)), http.MethodGet, "vinpatel.org", "/", edgeHeaders)
@@ -37,7 +40,7 @@ func TestIndexReflectsTheRequest(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{
 		`<h1 class="domain">vinpatel.org</h1>`,
-		`<dt>served</dt><dd>SJC · ray 8c1f2a3b4d5e6f70-SJC · origin `,
+		`<dt>served</dt><dd>SJC · ray 8c1f2a3b4d5e6f70-SJC</dd>`,
 		`<dt>proto</dt><dd>HTTP/3 · TLSv1.3</dd>`,
 		`<dt>from</dt><dd>AS13335 · CLOUDFLARENET - Cloudflare, Inc., US · San Jose, US</dd>`,
 		`<dt>build</dt><dd>abc1234 · <time datetime="2026-10-05T20:00:00Z">2026-10-05</time></dd>`,
@@ -49,10 +52,14 @@ func TestIndexReflectsTheRequest(t *testing.T) {
 		`<a href="https://www.instagram.com/vinfral7" rel="me">instagram.com/vinfral7</a>`,
 		`<a href="https://nirvanalabs.io">`,
 		`it is your own request, reflected.`,
+		` · dmarc cached 14m ago · `,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %s", want)
 		}
+	}
+	if !originLine.MatchString(body) {
+		t.Errorf("page lacks the origin line:\n%s", body)
 	}
 	h := rec.Header()
 	if got := h.Get("Cache-Control"); got != "private, no-store" {
@@ -70,13 +77,12 @@ func TestIndexWithoutEdgeHeaders(t *testing.T) {
 	o := testOptions(t)
 	o.BuildTime = time.Time{}
 	body := serve(newHandler(t, o), http.MethodGet, "vinpatel.org", "/", nil).Body.String()
-	for _, absent := range []string{"<dt>proto</dt>", "<dt>from</dt>", "ray 8c1f", "<time"} {
+	for _, absent := range []string{"<dt>served</dt>", "<dt>proto</dt>", "<dt>from</dt>", "ray 8c1f", "<time"} {
 		if strings.Contains(body, absent) {
 			t.Errorf("page should omit %s", absent)
 		}
 	}
 	for _, want := range []string{
-		"<dt>served</dt><dd>origin ",
 		"<dt>build</dt><dd>abc1234</dd>",
 		"<dt>mail</dt><dd>dmarc p=reject · mta-sts testing</dd>",
 	} {
@@ -97,6 +103,18 @@ func TestLookupMissesOmitParts(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %s", want)
 		}
+	}
+	if strings.Contains(body, "dmarc cached") || strings.Contains(body, "dmarc fetched") {
+		t.Errorf("origin line mentions dmarc without an answer:\n%s", body)
+	}
+}
+
+func TestFreshDMARCAnswerReadsAsJustNow(t *testing.T) {
+	o := testOptions(t)
+	o.Lookup = staticLookup{dmarc: "reject"}
+	body := serve(newHandler(t, o), http.MethodGet, "vinpatel.org", "/", nil).Body.String()
+	if !strings.Contains(body, " · dmarc fetched just now · ") {
+		t.Errorf("page lacks a just-now dmarc note:\n%s", body)
 	}
 }
 
@@ -124,8 +142,8 @@ func TestTraceJSON(t *testing.T) {
 	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
 		t.Errorf("Cache-Control = %q", got)
 	}
-	if !bytes.Contains(rec.Body.Bytes(), []byte(`"origin_ms":`)) {
-		t.Errorf("trace lacks origin_ms: %s", rec.Body)
+	if !bytes.Contains(rec.Body.Bytes(), []byte(`"ms":`)) {
+		t.Errorf("trace lacks origin ms: %s", rec.Body)
 	}
 	var got traceDoc
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
@@ -134,13 +152,16 @@ func TestTraceJSON(t *testing.T) {
 	if !got.Build.Time.Equal(testBuild) {
 		t.Errorf("build.time = %v, want %v", got.Build.Time, testBuild)
 	}
-	got.Served.OriginMS, got.Build.Time = 0, testBuild
+	if got.Origin.Go != runtime.Version() || got.Origin.Goroutines < 1 || got.Origin.HeapBytes < 1 || got.Origin.MS < 0 {
+		t.Errorf("origin = %+v", got.Origin)
+	}
+	got.Origin, got.Build.Time = originRow{}, testBuild
 	want := traceDoc{
-		Served: servedRow{Colo: "SJC", Ray: "8c1f2a3b4d5e6f70-SJC"},
+		Served: &servedRow{Colo: "SJC", Ray: "8c1f2a3b4d5e6f70-SJC"},
 		Proto:  &protoRow{HTTP: "HTTP/3", TLS: "TLSv1.3"},
 		From:   &fromRow{ASN: 13335, ASOrg: "CLOUDFLARENET - Cloudflare, Inc., US", City: "San Jose", Country: "US"},
 		Build:  buildRow{Version: "abc1234", Time: testBuild},
-		Mail:   mailRow{DMARC: "reject", MTASTS: "testing"},
+		Mail:   mailRow{DMARC: "reject", DMARCAgeS: 840, MTASTS: "testing"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("trace = %+v\nwant %+v", got, want)
@@ -155,12 +176,12 @@ func TestTraceJSONOmitsMissingRows(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	for _, key := range []string{"proto", "from"} {
+	for _, key := range []string{"served", "proto", "from"} {
 		if _, ok := got[key]; ok {
 			t.Errorf("trace has %q without edge headers", key)
 		}
 	}
-	for _, key := range []string{"served", "build", "mail"} {
+	for _, key := range []string{"build", "mail", "origin"} {
 		if _, ok := got[key]; !ok {
 			t.Errorf("trace lacks %q", key)
 		}

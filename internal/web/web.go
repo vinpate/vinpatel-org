@@ -29,7 +29,9 @@ const contact = "mailto:mail@vinpatel.org"
 
 // Lookup is the DNS knowledge the page needs; *resolve.Resolver satisfies it.
 type Lookup interface {
-	DMARCPolicy(ctx context.Context, domain string) string
+	// DMARCPolicy returns the p= value of the domain's DMARC record and how
+	// long ago it was fetched. Both are zero when unknown.
+	DMARCPolicy(ctx context.Context, domain string) (policy string, age time.Duration)
 	ASOrg(ctx context.Context, asn uint32) string
 }
 

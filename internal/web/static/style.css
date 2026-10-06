@@ -125,6 +125,10 @@ footer {
   color: var(--stone);
 }
 
+footer p { margin: 0; }
+
+footer .origin { margin-top: 0.4rem; }
+
 footer code { font-family: inherit; }
 
 @media (max-width: 34rem) {

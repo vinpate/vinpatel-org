@@ -36,7 +36,8 @@
   <p class="note">Mail from this domain is DKIM signed and DMARC enforced. Anything claiming to be from vinpatel.org that fails those checks did not come from me. Nothing on this page is stored; it is your own request, reflected.</p>
 </main>
 <footer>
-  <a href="/trace"><code>GET /trace</code></a> · <a href="https://github.com/vinpate/vinpatel-org">source</a>
+  <p><a href="/trace"><code>GET /trace</code></a> · <a href="https://github.com/vinpate/vinpatel-org">source</a></p>
+  <p class="origin">{{.Trace.OriginLine}}</p>
 </footer>
 </body>
 </html>

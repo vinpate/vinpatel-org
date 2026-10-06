@@ -82,8 +82,25 @@ func epoch() *clock { return &clock{t: time.Unix(1_790_000_000, 0)} }
 func TestDMARCPolicy(t *testing.T) {
 	u := &upstream{answers: map[string]string{"_dmarc.vinpatel.org": dmarcJSON}}
 	r := newResolver(t, u, epoch(), time.Second, 0)
-	if got := r.DMARCPolicy(t.Context(), "vinpatel.org"); got != "reject" {
+	if got, _ := r.DMARCPolicy(t.Context(), "vinpatel.org"); got != "reject" {
 		t.Errorf("DMARCPolicy = %q, want reject", got)
+	}
+}
+
+func TestDMARCPolicyReportsCacheAge(t *testing.T) {
+	clk := epoch()
+	u := &upstream{answers: map[string]string{"_dmarc.vinpatel.org": dmarcJSON}}
+	r := newResolver(t, u, clk, time.Second, 0)
+	if _, age := r.DMARCPolicy(t.Context(), "vinpatel.org"); age != 0 {
+		t.Errorf("fresh answer age = %v, want 0", age)
+	}
+	clk.Advance(14 * time.Minute)
+	policy, age := r.DMARCPolicy(t.Context(), "vinpatel.org")
+	if policy != "reject" || age != 14*time.Minute {
+		t.Errorf("cached answer = %q, %v; want reject, 14m0s", policy, age)
+	}
+	if n := u.calls.Load(); n != 1 {
+		t.Errorf("upstream calls = %d, want 1", n)
 	}
 }
 
@@ -150,7 +167,7 @@ func TestCacheHonorsTTL(t *testing.T) {
 
 	r.DMARCPolicy(ctx, "vinpatel.org")
 	clk.Advance(DMARCTTL - time.Second)
-	if got := r.DMARCPolicy(ctx, "vinpatel.org"); got != "reject" {
+	if got, _ := r.DMARCPolicy(ctx, "vinpatel.org"); got != "reject" {
 		t.Fatalf("cached DMARCPolicy = %q", got)
 	}
 	if n := u.calls.Load(); n != 1 {
@@ -174,8 +191,8 @@ func TestFailureIsUnknownAndNegativelyCached(t *testing.T) {
 			clk := epoch()
 			r := newResolver(t, u, clk, time.Second, 0)
 			ctx := t.Context()
-			if got := r.DMARCPolicy(ctx, "vinpatel.org"); got != "" {
-				t.Fatalf("DMARCPolicy = %q, want empty", got)
+			if got, age := r.DMARCPolicy(ctx, "vinpatel.org"); got != "" || age != 0 {
+				t.Fatalf("DMARCPolicy = %q, %v; want empty, 0", got, age)
 			}
 			clk.Advance(NegativeTTL - time.Second)
 			r.DMARCPolicy(ctx, "vinpatel.org")
@@ -195,7 +212,7 @@ func TestTimeoutIsUnknown(t *testing.T) {
 	u := &upstream{answers: map[string]string{"_dmarc.vinpatel.org": dmarcJSON}, delay: time.Second}
 	r := newResolver(t, u, epoch(), 20*time.Millisecond, 0)
 	start := time.Now()
-	if got := r.DMARCPolicy(t.Context(), "vinpatel.org"); got != "" {
+	if got, _ := r.DMARCPolicy(t.Context(), "vinpatel.org"); got != "" {
 		t.Errorf("DMARCPolicy = %q, want empty after timeout", got)
 	}
 	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
@@ -209,7 +226,7 @@ func TestConcurrentMissesShareOneQuery(t *testing.T) {
 	results := make([]string, 20)
 	var wg sync.WaitGroup
 	for i := range results {
-		wg.Go(func() { results[i] = r.DMARCPolicy(t.Context(), "vinpatel.org") })
+		wg.Go(func() { results[i], _ = r.DMARCPolicy(t.Context(), "vinpatel.org") })
 	}
 	wg.Wait()
 	for i, got := range results {
@@ -227,10 +244,10 @@ func TestAbandonedCallerStillFillsCache(t *testing.T) {
 	r := newResolver(t, u, epoch(), time.Second, 0)
 	gone, cancel := context.WithCancel(t.Context())
 	cancel()
-	if got := r.DMARCPolicy(gone, "vinpatel.org"); got != "" {
+	if got, _ := r.DMARCPolicy(gone, "vinpatel.org"); got != "" {
 		t.Fatalf("cancelled caller got %q, want empty", got)
 	}
-	if got := r.DMARCPolicy(t.Context(), "vinpatel.org"); got != "reject" {
+	if got, _ := r.DMARCPolicy(t.Context(), "vinpatel.org"); got != "reject" {
 		t.Fatalf("next caller got %q, want reject", got)
 	}
 	if n := u.calls.Load(); n != 1 {
@@ -254,7 +271,7 @@ func TestCacheIsBounded(t *testing.T) {
 
 func TestEmptyEndpointDisablesLookups(t *testing.T) {
 	r := New(Options{})
-	if got := r.DMARCPolicy(t.Context(), "vinpatel.org"); got != "" {
+	if got, _ := r.DMARCPolicy(t.Context(), "vinpatel.org"); got != "" {
 		t.Errorf("DMARCPolicy = %q, want empty", got)
 	}
 	if got := r.ASOrg(t.Context(), 13335); got != "" {

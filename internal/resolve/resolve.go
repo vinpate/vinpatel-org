@@ -52,13 +52,13 @@ type Resolver struct {
 type entry struct {
 	records []string
 	ok      bool
+	fetched time.Time
 	expires time.Time
 }
 
 type call struct {
-	done    chan struct{}
-	records []string
-	ok      bool
+	done  chan struct{}
+	entry entry
 }
 
 func New(o Options) *Resolver {
@@ -87,18 +87,24 @@ func New(o Options) *Resolver {
 }
 
 // TXT returns the TXT records for name and whether the lookup succeeded.
-// Concurrent misses for one name share a single upstream query, and that
-// query runs to completion even if the caller that started it gives up.
 func (r *Resolver) TXT(ctx context.Context, name string, ttl time.Duration) ([]string, bool) {
+	e := r.txt(ctx, name, ttl)
+	return e.records, e.ok
+}
+
+// txt serves name from the cache or from one shared upstream query.
+// Concurrent misses for one name share that query, and it runs to
+// completion even if the caller that started it gives up.
+func (r *Resolver) txt(ctx context.Context, name string, ttl time.Duration) entry {
 	if r.endpoint == "" {
-		return nil, false
+		return entry{}
 	}
 	name = strings.TrimSuffix(strings.ToLower(name), ".")
 
 	r.mu.Lock()
 	if e, hit := r.cache[name]; hit && r.now().Before(e.expires) {
 		r.mu.Unlock()
-		return e.records, e.ok
+		return e
 	}
 	c, running := r.inflight[name]
 	if !running {
@@ -110,19 +116,20 @@ func (r *Resolver) TXT(ctx context.Context, name string, ttl time.Duration) ([]s
 
 	select {
 	case <-c.done:
-		return c.records, c.ok
+		return c.entry
 	case <-ctx.Done():
-		return nil, false
+		return entry{}
 	}
 }
 
-// DMARCPolicy returns the p= tag of domain's DMARC record, or "" if unknown.
-func (r *Resolver) DMARCPolicy(ctx context.Context, domain string) string {
-	records, ok := r.TXT(ctx, "_dmarc."+domain, DMARCTTL)
-	if !ok {
-		return ""
+// DMARCPolicy returns the p= tag of domain's DMARC record and how long ago
+// it was fetched. Both are zero when the record is unknown.
+func (r *Resolver) DMARCPolicy(ctx context.Context, domain string) (string, time.Duration) {
+	e := r.txt(ctx, "_dmarc."+domain, DMARCTTL)
+	if !e.ok {
+		return "", 0
 	}
-	return dmarcPolicy(records)
+	return dmarcPolicy(e.records), r.now().Sub(e.fetched)
 }
 
 // ASOrg returns the organization Team Cymru lists for asn, or "" if unknown.
@@ -141,13 +148,14 @@ func (r *Resolver) fill(name string, ttl time.Duration, c *call) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
 	defer cancel()
 	records, err := r.query(ctx, name)
-	c.records, c.ok = records, err == nil
 	if err != nil {
 		ttl = NegativeTTL
 	}
+	now := r.now()
+	c.entry = entry{records: records, ok: err == nil, fetched: now, expires: now.Add(ttl)}
 
 	r.mu.Lock()
-	r.store(name, entry{records: c.records, ok: c.ok, expires: r.now().Add(ttl)})
+	r.store(name, c.entry)
 	delete(r.inflight, name)
 	r.mu.Unlock()
 	close(c.done)
