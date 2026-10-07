@@ -1,55 +1,62 @@
 # vinpatel.org
 
-The site behind `mail@vinpatel.org`. It is one page that reflects your own
-request as it reached Cloudflare: the data center that answered, the HTTP
-and TLS versions you negotiated, the network you came from, the build that
-rendered the page, and the domain's mail setup. The footer adds two
-lines about the origin itself: how long it spent preparing this
-response, beside the p50 and p99 of every page and trace since it
-started, then how old its mail DNS answers are, the Go version, and the
-goroutines and memory in use. `GET /trace` returns the same data as
-JSON.
+The site behind `mail@vinpatel.org`. One page reflects your request as it
+reached Cloudflare: the data center that answered, the HTTP and TLS
+versions, your network, the build that rendered it and the domain's mail
+setup, checked live. The footer reports on the origin: this response's
+time with the p50 and p99 since start, the age of its DNS answers, the Go
+version, goroutines and heap. `GET /trace` returns the same as JSON.
 
-## How it runs
+## How it works
 
 ```
 visitor ─HTTPS─▶ Cloudflare edge ─▶ fallback Worker ─▶ Tunnel ─▶ cloudflared ─▶ web
 ```
 
-- `web` is a Go program that uses only the standard library. It ships as a
-  `scratch` image and runs as an unprivileged user on a read-only
-  filesystem with every capability dropped.
-- The host publishes no ports. `cloudflared` dials out to Cloudflare and
-  nothing dials in.
-- The origin drops visitor IP headers before any handler runs and never
-  logs an IP address, user agent or referrer. There are no cookies, no
-  JavaScript and no third-party requests; the one `script` element is a
-  JSON-LD description of the page for search engines. HTML responses say
-  `Cache-Control: no-transform`, so Cloudflare injects nothing into them.
-- When the origin is unreachable, a Cloudflare Worker serves a static
-  contact card instead of an error page.
-- The MTA-STS policy is served by a second Worker from text Terraform
-  builds, so it stays fetchable while the origin is down and its DNS
-  `id` changes with it.
-- `compose.yaml` is the whole runtime and `infra/` declares the Cloudflare
-  side in Terraform, so moving to another Docker host needs no DNS change.
+- **Nothing dials in.** The host publishes no ports; `cloudflared` dials
+  out to Cloudflare (`compose.yaml`).
+- **A small, locked-down origin.** `web` uses only Go's standard library,
+  ships as a `scratch` image and runs unprivileged on a read-only
+  filesystem with no capabilities. CI smoke-tests it that way before
+  publishing (`scripts/smoke.sh`).
+- **Nothing about the visitor is kept.** IP headers are deleted before any
+  handler runs, and no IP address, user agent or referrer is logged
+  (`internal/web/middleware.go`). There are no cookies, no JavaScript and
+  no third-party requests; the one `script` element is JSON-LD for search
+  engines (`internal/web/profile.go`).
+- **Lookups cannot stall the page.** Mail records come over
+  DNS-over-HTTPS through a bounded cache that coalesces concurrent misses
+  and remembers failures briefly (`internal/resolve`).
+- **Percentiles without locks.** Each response time is one atomic add to a
+  log-bucketed histogram, with nothing allocated per request
+  (`internal/web/latency.go`); pages also send it as `Server-Timing`.
+- **An outage shows a card, not an error.** When the origin is
+  unreachable, a Worker serves a static contact card (`edge/fallback.js`).
+  A second Worker serves the MTA-STS policy from text Terraform builds, so
+  the policy outlives an outage and its DNS `id` follows its content
+  (`edge/mta-sts.js`, `infra/mail.tf`).
+- **The edge is code.** `infra/` declares the tunnel, DNS including the
+  mail records, the transform and redirect rules, the zone and bot
+  settings and both Workers. HTML responses say `Cache-Control:
+  no-transform`, so Cloudflare injects nothing into them.
 
-## Layout
+## Code map
 
 | Path | What it is |
 |------|------------|
 | `cmd/server` | entry point, server limits, graceful shutdown, `-healthcheck` |
 | `internal/config` | environment variables and their validation |
 | `internal/edge` | Cloudflare request headers to a trace |
-| `internal/resolve` | DNS-over-HTTPS TXT lookups behind a bounded, coalescing cache |
-| `internal/web` | routes, middleware, the template and the stylesheet |
-| `edge/fallback.js` | the Worker that serves the offline card |
-| `edge/mta-sts.js` | the Worker that serves the mail policy |
-| `infra/` | tunnel, DNS including the mail records, transform and redirect rules, zone settings, Workers |
-| `compose.yaml` | `web` and `cloudflared` |
-| `Dockerfile` | two-stage build to a `scratch` image |
+| `internal/resolve` | DNS-over-HTTPS lookups, the cache and the mail posture |
+| `internal/web` | routes, middleware, the page, its template and stylesheet |
+| `edge/` | the two Workers and their tests |
+| `infra/` | the Cloudflare side, in Terraform |
 | `scripts/` | the image smoke test and the tunnel token helper |
-| `.github/` | the CI workflow and Dependabot |
+| `.github/` | CI and Dependabot |
+
+A request enters at `internal/web/web.go`, passes the handlers in
+`middleware.go`, and is rendered by `page.go` from `internal/edge` and
+`internal/resolve`.
 
 ## Develop
 
@@ -64,20 +71,31 @@ SITE_HOST=localhost DOH_URL= go run ./cmd/server    # then open http://localhost
 
 ## Deploy
 
-Secrets never live in the repository. The `op://` references in
-`infra/op.env` and `.env.tpl` point at items in a 1Password vault, and the
-1Password CLI fills them in at run time.
+Secrets stay in 1Password: `infra/op.env` and `.env.tpl` hold only
+`op://` references, filled in at run time.
 
 ```sh
+terraform -chdir=infra init
 op run --env-file infra/op.env -- terraform -chdir=infra apply   # tunnel, DNS, rules, Workers
 op run --env-file infra/op.env -- scripts/tunnel-token.sh        # store the tunnel's connector token
 op inject -i .env.tpl -o .env                                    # render the environment file
 docker compose up -d                                             # start web and cloudflared
 ```
 
-The host needs Docker, the 1Password CLI and, for the first two commands,
-Terraform. Every merge to `main` publishes a new image; set `IMAGE_TAG`
+The host needs Docker and the 1Password CLI, and Terraform for the first
+three commands. Every merge to `main` publishes
+`ghcr.io/vinpate/vinpatel-org:sha-<commit>` and `:latest`; set `IMAGE_TAG`
 in `.env` to pin one.
+
+## Verify a build
+
+The page's `build` row names the commit it runs; each image's provenance
+attestation and SBOM tie it to that commit and the CI run that built it:
+
+```sh
+curl -s https://vinpatel.org/trace     # build.version
+docker buildx imagetools inspect ghcr.io/vinpate/vinpatel-org:latest --format '{{json .Provenance}}'
+```
 
 ## Configuration
 
