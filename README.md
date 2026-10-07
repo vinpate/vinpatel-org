@@ -3,7 +3,7 @@
 The site behind `mail@vinpatel.org`. It is one page that reflects your own
 request as it reached Cloudflare: the data center that answered, the HTTP
 and TLS versions you negotiated, the network you came from, the build that
-rendered the page, and the domain's mail policy. The footer adds a line
+rendered the page, and the domain's mail setup. The footer adds a line
 about the origin itself: how long it took to answer, the Go version, and
 the goroutines and memory in use. `GET /trace` returns the same data as
 JSON.
@@ -81,8 +81,6 @@ in `.env` to pin one.
 |----------|---------|
 | `LISTEN` | `:8080` |
 | `SITE_HOST` | `vinpatel.org` |
-| `MTA_STS_MODE` | `testing` |
-| `MTA_STS_MX` | `mx01.mail.icloud.com,mx02.mail.icloud.com` |
-| `MTA_STS_MAX_AGE` | `604800` |
+| `DKIM_SELECTOR` | `sig1`; the selector whose key the mail row checks |
 | `DOH_URL` | `https://cloudflare-dns.com/dns-query`; empty disables lookups |
 | `LOG_LEVEL` | `info`; `debug` adds request header names, never values |

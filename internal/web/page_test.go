@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"vinpatel.org/site/internal/resolve"
 )
 
 var edgeHeaders = http.Header{
@@ -24,7 +26,7 @@ var edgeHeaders = http.Header{
 	"Cf-Ipcountry": {"US"},
 }
 
-var originLine = regexp.MustCompile(`<p class="origin">origin \d+\.\d\d ms(?: · dmarc [a-z0-9 ]+)? · ` + regexp.QuoteMeta(runtime.Version()) + ` · \d+ goroutines · \d+\.\d MB heap</p>`)
+var originLine = regexp.MustCompile(`<p class="origin">origin \d+\.\d\d ms(?: · mail dns [a-z0-9 ]+)? · ` + regexp.QuoteMeta(runtime.Version()) + ` · \d+ goroutines · \d+\.\d MB heap</p>`)
 
 func TestIndexReflectsTheRequest(t *testing.T) {
 	rec := serve(newHandler(t, testOptions(t)), http.MethodGet, "vinpatel.org", "/", edgeHeaders)
@@ -38,7 +40,7 @@ func TestIndexReflectsTheRequest(t *testing.T) {
 		`<dt>proto</dt><dd>HTTP/3 · TLSv1.3</dd>`,
 		`<dt>from</dt><dd>AS13335 · CLOUDFLARENET - Cloudflare, Inc., US · San Jose, US</dd>`,
 		`<dt>build</dt><dd>abc1234 · <time datetime="2026-10-05T20:00:00Z">2026-10-05</time></dd>`,
-		`<dt>mail</dt><dd>dmarc p=reject · mta-sts testing</dd>`,
+		`<dt>mail</dt><dd>spf ~all · dkim sig1 · dmarc p=reject · mta-sts testing · tls-rpt · dnssec</dd>`,
 		`<a href="mailto:mail@vinpatel.org">mail@vinpatel.org</a>`,
 		`<a href="https://github.com/vinpate" rel="me">github.com/vinpate</a>`,
 		`<a href="https://www.linkedin.com/in/vin-pate" rel="me">linkedin.com/in/vin-pate</a>`,
@@ -46,7 +48,7 @@ func TestIndexReflectsTheRequest(t *testing.T) {
 		`<a href="https://www.instagram.com/vinfral7" rel="me">instagram.com/vinfral7</a>`,
 		`<a href="https://nirvanalabs.io">`,
 		`it is your own request, reflected.`,
-		` · dmarc cached 14m ago · `,
+		` · mail dns cached 14m ago · `,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %s", want)
@@ -78,7 +80,7 @@ func TestIndexWithoutEdgeHeaders(t *testing.T) {
 	}
 	for _, want := range []string{
 		"<dt>build</dt><dd>abc1234</dd>",
-		"<dt>mail</dt><dd>dmarc p=reject · mta-sts testing</dd>",
+		"<dt>mail</dt><dd>spf ~all · dkim sig1 · dmarc p=reject · mta-sts testing · tls-rpt · dnssec</dd>",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %s", want)
@@ -92,23 +94,29 @@ func TestLookupMissesOmitParts(t *testing.T) {
 	body := serve(newHandler(t, o), http.MethodGet, "vinpatel.org", "/", edgeHeaders).Body.String()
 	for _, want := range []string{
 		"<dt>from</dt><dd>AS13335 · San Jose, US</dd>",
-		"<dt>mail</dt><dd>mta-sts testing</dd>",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %s", want)
 		}
 	}
-	if strings.Contains(body, "dmarc cached") || strings.Contains(body, "dmarc fetched") {
-		t.Errorf("origin line mentions dmarc without an answer:\n%s", body)
+	if n := strings.Count(body, "<dt>mail</dt>"); n != 1 {
+		t.Errorf("page has %d mail rows, want only the contact row when nothing is confirmed:\n%s", n, body)
+	}
+	if strings.Contains(body, "mail dns") {
+		t.Errorf("origin line mentions mail dns without an answer:\n%s", body)
 	}
 }
 
-func TestFreshDMARCAnswerReadsAsJustNow(t *testing.T) {
+func TestFreshMailAnswerReadsAsJustNow(t *testing.T) {
 	o := testOptions(t)
-	o.Lookup = fakeLookup{dmarc: "reject"}
+	o.Lookup = fakeLookup{mail: resolve.Mail{DMARC: "reject"}}
 	body := serve(newHandler(t, o), http.MethodGet, "vinpatel.org", "/", nil).Body.String()
-	if !strings.Contains(body, " · dmarc fetched just now · ") {
-		t.Errorf("page lacks a just-now dmarc note:\n%s", body)
+	if !strings.Contains(body, " · mail dns fetched just now · ") {
+		t.Errorf("page lacks a just-now mail dns note:\n%s", body)
+	}
+	body = serve(newHandler(t, o), http.MethodGet, "vinpatel.org", "/", nil).Body.String()
+	if !strings.Contains(body, "<dt>mail</dt><dd>dmarc p=reject</dd>") {
+		t.Errorf("one known part should still make a row:\n%s", body)
 	}
 }
 
@@ -155,7 +163,7 @@ func TestTraceJSON(t *testing.T) {
 		Proto:  &protoRow{HTTP: "HTTP/3", TLS: "TLSv1.3"},
 		From:   &fromRow{ASN: 13335, ASOrg: "CLOUDFLARENET - Cloudflare, Inc., US", City: "San Jose", Country: "US"},
 		Build:  buildRow{Version: "abc1234", Time: testBuild},
-		Mail:   mailRow{DMARC: "reject", DMARCAgeS: 840, MTASTS: "testing"},
+		Mail:   mailRow{SPF: "~all", DKIM: "sig1", DMARC: "reject", MTASTS: "testing", TLSRPT: true, DNSSEC: true, AgeS: 840},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("trace = %+v\nwant %+v", got, want)

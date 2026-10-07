@@ -11,21 +11,15 @@ import (
 	"strings"
 )
 
-// maxMTASTSAge is the RFC 8461 ceiling for max_age: one year in seconds.
-const maxMTASTSAge = 31557600
-
 type Config struct {
 	Listen       string
 	SiteHost     string
-	MTASTSMode   string
-	MTASTSMX     []string
-	MTASTSMaxAge int
+	DKIMSelector string
 	DoHURL       string
 	LogLevel     slog.Level
 }
 
-func (c Config) WWWHost() string    { return "www." + c.SiteHost }
-func (c Config) MTASTSHost() string { return "mta-sts." + c.SiteHost }
+func (c Config) WWWHost() string { return "www." + c.SiteHost }
 
 // Load reads configuration through lookup, normally os.LookupEnv. Unset or
 // blank variables take their defaults, except DOH_URL, where an explicit
@@ -39,10 +33,10 @@ func Load(lookup func(string) (string, bool)) (Config, error) {
 	}
 
 	c := Config{
-		Listen:     get("LISTEN", ":8080"),
-		SiteHost:   strings.TrimSuffix(strings.ToLower(get("SITE_HOST", "vinpatel.org")), "."),
-		MTASTSMode: get("MTA_STS_MODE", "testing"),
-		DoHURL:     "https://cloudflare-dns.com/dns-query",
+		Listen:       get("LISTEN", ":8080"),
+		SiteHost:     strings.TrimSuffix(strings.ToLower(get("SITE_HOST", "vinpatel.org")), "."),
+		DKIMSelector: strings.ToLower(get("DKIM_SELECTOR", "sig1")),
+		DoHURL:       "https://cloudflare-dns.com/dns-query",
 	}
 	if v, ok := lookup("DOH_URL"); ok {
 		c.DoHURL = strings.TrimSpace(v)
@@ -57,24 +51,8 @@ func Load(lookup func(string) (string, bool)) (Config, error) {
 	if !validHost(c.SiteHost) {
 		errs = append(errs, fmt.Errorf("SITE_HOST %q: want a bare hostname", c.SiteHost))
 	}
-	switch c.MTASTSMode {
-	case "testing", "enforce", "none":
-	default:
-		errs = append(errs, fmt.Errorf("MTA_STS_MODE %q: want testing, enforce or none", c.MTASTSMode))
-	}
-	for mx := range strings.SplitSeq(get("MTA_STS_MX", "mx01.mail.icloud.com,mx02.mail.icloud.com"), ",") {
-		mx = strings.ToLower(strings.TrimSpace(mx))
-		if !validHost(strings.TrimPrefix(mx, "*.")) {
-			errs = append(errs, fmt.Errorf("MTA_STS_MX entry %q: want a hostname or *.hostname", mx))
-			continue
-		}
-		c.MTASTSMX = append(c.MTASTSMX, mx)
-	}
-	maxAge := get("MTA_STS_MAX_AGE", "604800")
-	if n, err := strconv.Atoi(maxAge); err != nil || n < 1 || n > maxMTASTSAge {
-		errs = append(errs, fmt.Errorf("MTA_STS_MAX_AGE %q: want 1 to %d seconds", maxAge, maxMTASTSAge))
-	} else {
-		c.MTASTSMaxAge = n
+	if !validHost(c.DKIMSelector) {
+		errs = append(errs, fmt.Errorf("DKIM_SELECTOR %q: want a DNS name such as sig1", c.DKIMSelector))
 	}
 	if c.DoHURL != "" {
 		if u, err := url.Parse(c.DoHURL); err != nil || u.Scheme != "https" || u.Host == "" {

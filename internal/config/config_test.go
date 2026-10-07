@@ -22,29 +22,25 @@ func TestLoadDefaults(t *testing.T) {
 	want := Config{
 		Listen:       ":8080",
 		SiteHost:     "vinpatel.org",
-		MTASTSMode:   "testing",
-		MTASTSMX:     []string{"mx01.mail.icloud.com", "mx02.mail.icloud.com"},
-		MTASTSMaxAge: 604800,
+		DKIMSelector: "sig1",
 		DoHURL:       "https://cloudflare-dns.com/dns-query",
 		LogLevel:     slog.LevelInfo,
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Load() = %+v\nwant %+v", got, want)
 	}
-	if got.WWWHost() != "www.vinpatel.org" || got.MTASTSHost() != "mta-sts.vinpatel.org" {
-		t.Errorf("derived hosts = %q, %q", got.WWWHost(), got.MTASTSHost())
+	if got.WWWHost() != "www.vinpatel.org" {
+		t.Errorf("WWWHost = %q", got.WWWHost())
 	}
 }
 
 func TestLoadOverrides(t *testing.T) {
 	got, err := Load(env(map[string]string{
-		"LISTEN":          "127.0.0.1:9000",
-		"SITE_HOST":       " Example.ORG. ",
-		"MTA_STS_MODE":    "enforce",
-		"MTA_STS_MX":      " MX1.example.net , *.mx.example.net ",
-		"MTA_STS_MAX_AGE": "86400",
-		"DOH_URL":         "https://dns.example/dns-query",
-		"LOG_LEVEL":       "debug",
+		"LISTEN":        "127.0.0.1:9000",
+		"SITE_HOST":     " Example.ORG. ",
+		"DKIM_SELECTOR": " Sig2 ",
+		"DOH_URL":       "https://dns.example/dns-query",
+		"LOG_LEVEL":     "debug",
 	}))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -52,9 +48,7 @@ func TestLoadOverrides(t *testing.T) {
 	want := Config{
 		Listen:       "127.0.0.1:9000",
 		SiteHost:     "example.org",
-		MTASTSMode:   "enforce",
-		MTASTSMX:     []string{"mx1.example.net", "*.mx.example.net"},
-		MTASTSMaxAge: 86400,
+		DKIMSelector: "sig2",
 		DoHURL:       "https://dns.example/dns-query",
 		LogLevel:     slog.LevelDebug,
 	}
@@ -84,12 +78,9 @@ func TestLoadRejects(t *testing.T) {
 		{"SITE_HOST", "vinpatel.org/path"},
 		{"SITE_HOST", "-bad.example"},
 		{"SITE_HOST", "a..b"},
-		{"MTA_STS_MODE", "strict"},
-		{"MTA_STS_MX", "mx01.mail.icloud.com,,mx02.mail.icloud.com"},
-		{"MTA_STS_MX", "mx_01.example"},
-		{"MTA_STS_MAX_AGE", "0"},
-		{"MTA_STS_MAX_AGE", "31557601"},
-		{"MTA_STS_MAX_AGE", "1w"},
+		{"DKIM_SELECTOR", "sig 1"},
+		{"DKIM_SELECTOR", "-sig1"},
+		{"DKIM_SELECTOR", "sig1..mail"},
 		{"DOH_URL", "http://cloudflare-dns.com/dns-query"},
 		{"DOH_URL", "cloudflare-dns.com"},
 		{"LOG_LEVEL", "loud"},
@@ -105,8 +96,8 @@ func TestLoadRejects(t *testing.T) {
 }
 
 func TestLoadReportsEveryProblem(t *testing.T) {
-	_, err := Load(env(map[string]string{"MTA_STS_MODE": "strict", "LOG_LEVEL": "loud"}))
-	for _, key := range []string{"MTA_STS_MODE", "LOG_LEVEL"} {
+	_, err := Load(env(map[string]string{"DKIM_SELECTOR": "-x", "LOG_LEVEL": "loud"}))
+	for _, key := range []string{"DKIM_SELECTOR", "LOG_LEVEL"} {
 		if err == nil || !strings.Contains(err.Error(), key) {
 			t.Errorf("error = %v, want it to name %s", err, key)
 		}

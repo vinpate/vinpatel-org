@@ -12,23 +12,24 @@ import (
 	"time"
 
 	"vinpatel.org/site/internal/config"
+	"vinpatel.org/site/internal/resolve"
 )
 
 var testBuild = time.Date(2026, 10, 5, 20, 0, 0, 0, time.UTC)
 
-// fakeLookup answers only for the site's own domain and the ASN in
-// edgeHeaders, so a handler that asks about the wrong input gets nothing.
+// fakeLookup answers only for the site's own domain, its selector and the
+// ASN in edgeHeaders, so a handler that asks about the wrong input gets
+// nothing.
 type fakeLookup struct {
-	dmarc string
-	age   time.Duration
-	org   string
+	mail resolve.Mail
+	org  string
 }
 
-func (l fakeLookup) DMARCPolicy(_ context.Context, domain string) (string, time.Duration) {
-	if domain != "vinpatel.org" {
-		return "", 0
+func (l fakeLookup) Mail(_ context.Context, domain, selector string) resolve.Mail {
+	if domain != "vinpatel.org" || selector != "sig1" {
+		return resolve.Mail{}
 	}
-	return l.dmarc, l.age
+	return l.mail
 }
 
 func (l fakeLookup) ASOrg(_ context.Context, asn uint32) string {
@@ -37,6 +38,8 @@ func (l fakeLookup) ASOrg(_ context.Context, asn uint32) string {
 	}
 	return l.org
 }
+
+var fullMail = resolve.Mail{SPF: "~all", DKIM: "sig1", DMARC: "reject", MTASTS: "testing", TLSRPT: true, DNSSEC: true, Age: 14 * time.Minute}
 
 func testOptions(t *testing.T) Options {
 	t.Helper()
@@ -48,7 +51,7 @@ func testOptions(t *testing.T) Options {
 		Config:    cfg,
 		Version:   "abc1234",
 		BuildTime: testBuild,
-		Lookup:    fakeLookup{dmarc: "reject", age: 14 * time.Minute, org: "CLOUDFLARENET - Cloudflare, Inc., US"},
+		Lookup:    fakeLookup{mail: fullMail, org: "CLOUDFLARENET - Cloudflare, Inc., US"},
 		Logger:    slog.New(slog.DiscardHandler),
 	}
 }
@@ -107,9 +110,7 @@ func TestRoutes(t *testing.T) {
 		{"apex uppercase", "VINPATEL.ORG", "/robots.txt", 200, "text/plain; charset=utf-8", "Allow: /", ""},
 		{"apex trailing dot", "vinpatel.org.", "/robots.txt", 200, "text/plain; charset=utf-8", "Allow: /", ""},
 		{"unknown apex path", "vinpatel.org", "/wp-login.php", 404, "text/html; charset=utf-8", `<link rel="stylesheet" href="/style.css">`, ""},
-		{"mta-sts policy", "mta-sts.vinpatel.org", "/.well-known/mta-sts.txt", 200, "text/plain; charset=utf-8", "version: STSv1\r\n", ""},
-		{"mta-sts elsewhere", "mta-sts.vinpatel.org", "/", 404, "text/plain; charset=utf-8", "not found\n", ""},
-		{"policy only on mta-sts host", "vinpatel.org", "/.well-known/mta-sts.txt", 404, "text/html; charset=utf-8", "", ""},
+		{"old policy host to apex", "mta-sts.vinpatel.org", "/.well-known/mta-sts.txt", 308, "", "", "https://vinpatel.org/.well-known/mta-sts.txt"},
 		{"www to apex", "www.vinpatel.org", "/some/path?x=1", 308, "", "", "https://vinpatel.org/some/path?x=1"},
 		{"unknown host to apex", "evil.example", "/", 308, "", "", "https://vinpatel.org/"},
 	}
@@ -143,24 +144,6 @@ func TestSecurityTXT(t *testing.T) {
 	}
 }
 
-func TestMTASTSPolicyFollowsConfig(t *testing.T) {
-	o := testOptions(t)
-	rec := serve(newHandler(t, o), http.MethodGet, "mta-sts.vinpatel.org", "/.well-known/mta-sts.txt", nil)
-	want := "version: STSv1\r\nmode: testing\r\nmx: mx01.mail.icloud.com\r\nmx: mx02.mail.icloud.com\r\nmax_age: 604800\r\n"
-	if rec.Body.String() != want {
-		t.Errorf("default policy = %q, want %q", rec.Body.String(), want)
-	}
-
-	o.Config.MTASTSMode = "enforce"
-	o.Config.MTASTSMX = []string{"*.mx.example.net"}
-	o.Config.MTASTSMaxAge = 86400
-	rec = serve(newHandler(t, o), http.MethodGet, "mta-sts.vinpatel.org", "/.well-known/mta-sts.txt", nil)
-	want = "version: STSv1\r\nmode: enforce\r\nmx: *.mx.example.net\r\nmax_age: 86400\r\n"
-	if rec.Body.String() != want {
-		t.Errorf("enforce policy = %q, want %q", rec.Body.String(), want)
-	}
-}
-
 func TestSecurityHeadersOnEveryResponse(t *testing.T) {
 	want := map[string]string{
 		"Strict-Transport-Security":    "max-age=63072000; includeSubDomains",
@@ -177,7 +160,7 @@ func TestSecurityHeadersOnEveryResponse(t *testing.T) {
 		{http.MethodGet, "vinpatel.org", "/"},
 		{http.MethodGet, "vinpatel.org", "/style.css"},
 		{http.MethodGet, "vinpatel.org", "/missing"},
-		{http.MethodGet, "mta-sts.vinpatel.org", "/.well-known/mta-sts.txt"},
+		{http.MethodGet, "vinpatel.org", "/trace"},
 		{http.MethodGet, "www.vinpatel.org", "/"},
 		{http.MethodPost, "vinpatel.org", "/"},
 		{http.MethodGet, "127.0.0.1:8080", "/healthz"},
@@ -196,7 +179,7 @@ func TestMethodNotAllowed(t *testing.T) {
 	h := newHandler(t, testOptions(t))
 	for _, tc := range []struct{ method, host string }{
 		{http.MethodPost, "vinpatel.org"},
-		{http.MethodPut, "mta-sts.vinpatel.org"},
+		{http.MethodPut, "www.vinpatel.org"},
 		{http.MethodDelete, "evil.example"},
 		{http.MethodOptions, "vinpatel.org"},
 	} {

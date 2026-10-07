@@ -49,9 +49,6 @@ if echo "$headers" | grep -qi '^server:'; then
 	fail "Server header present"
 fi
 
-curl -fsS -H 'Host: mta-sts.vinpatel.org' "$base/.well-known/mta-sts.txt" | grep -q '^mode: testing' ||
-	fail "MTA-STS policy missing"
-
 [ "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: www.vinpatel.org' "$base/")" = 308 ] ||
 	fail "www does not redirect"
 

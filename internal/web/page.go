@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"vinpatel.org/site/internal/edge"
+	"vinpatel.org/site/internal/resolve"
 )
 
 // traceDoc is the request trace in the shape /trace returns. Rows with no
@@ -47,10 +48,31 @@ type buildRow struct {
 	Time    time.Time `json:"time,omitzero"`
 }
 
+// mailRow is the mail posture a sending server would find. Empty and false
+// mean unconfirmed; AgeS is the age of the oldest answer behind it.
 type mailRow struct {
-	DMARC     string `json:"dmarc,omitempty"`
-	DMARCAgeS int    `json:"dmarc_age_s,omitempty"`
-	MTASTS    string `json:"mta_sts"`
+	SPF    string `json:"spf,omitempty"`
+	DKIM   string `json:"dkim,omitempty"`
+	DMARC  string `json:"dmarc,omitempty"`
+	MTASTS string `json:"mta_sts,omitempty"`
+	TLSRPT bool   `json:"tls_rpt"`
+	DNSSEC bool   `json:"dnssec"`
+	AgeS   int    `json:"age_s,omitempty"`
+}
+
+func (m mailRow) known() bool {
+	return m.SPF != "" || m.DKIM != "" || m.DMARC != "" || m.MTASTS != "" || m.TLSRPT || m.DNSSEC
+}
+
+func (m mailRow) String() string {
+	return join(
+		prefix("spf ", m.SPF),
+		prefix("dkim ", m.DKIM),
+		prefix("dmarc p=", m.DMARC),
+		prefix("mta-sts ", m.MTASTS),
+		flag("tls-rpt", m.TLSRPT),
+		flag("dnssec", m.DNSSEC),
+	)
 }
 
 // originRow describes the process that answered: how long it spent on
@@ -99,16 +121,19 @@ func (s *site) traceJSON(w http.ResponseWriter, r *http.Request) {
 // covers parsing and lookups; Server-Timing on the response adds rendering.
 func (s *site) trace(r *http.Request, start time.Time) traceDoc {
 	t := edge.Parse(r.Header)
-	var org, dmarc string
-	var dmarcAge time.Duration
+	var org string
+	var mail resolve.Mail
 	var wg sync.WaitGroup
 	wg.Go(func() { org = s.lookup.ASOrg(r.Context(), t.ASN) })
-	wg.Go(func() { dmarc, dmarcAge = s.lookup.DMARCPolicy(r.Context(), s.cfg.SiteHost) })
+	wg.Go(func() { mail = s.lookup.Mail(r.Context(), s.cfg.SiteHost, s.cfg.DKIMSelector) })
 	wg.Wait()
 
 	doc := traceDoc{
 		Build: buildRow{Version: s.version, Time: s.built},
-		Mail:  mailRow{DMARC: dmarc, DMARCAgeS: int(dmarcAge.Seconds()), MTASTS: s.cfg.MTASTSMode},
+		Mail: mailRow{
+			SPF: mail.SPF, DKIM: mail.DKIM, DMARC: mail.DMARC, MTASTS: mail.MTASTS,
+			TLSRPT: mail.TLSRPT, DNSSEC: mail.DNSSEC, AgeS: int(mail.Age.Seconds()),
+		},
 	}
 	if t.Colo != "" || t.Ray != "" {
 		doc.Served = &servedRow{Colo: t.Colo, Ray: t.Ray}
@@ -154,22 +179,23 @@ func (d traceDoc) Rows() []row {
 		place := strings.Join(nonEmpty(d.From.City, d.From.Country), ", ")
 		rows = append(rows, row{Key: "from", Value: join(asn, d.From.ASOrg, place)})
 	}
-	return append(rows,
-		row{Key: "build", Value: d.Build.Version, Time: d.Build.Time},
-		row{Key: "mail", Value: join(prefix("dmarc p=", d.Mail.DMARC), "mta-sts "+d.Mail.MTASTS)},
-	)
+	rows = append(rows, row{Key: "build", Value: d.Build.Version, Time: d.Build.Time})
+	if d.Mail.known() {
+		rows = append(rows, row{Key: "mail", Value: d.Mail.String()})
+	}
+	return rows
 }
 
 // OriginLine is the page's footer: what answered, and how fresh its DNS
 // knowledge is.
 func (d traceDoc) OriginLine() string {
-	var dmarc string
-	if d.Mail.DMARC != "" {
-		dmarc = "dmarc " + cachedAgo(time.Duration(d.Mail.DMARCAgeS)*time.Second)
+	var dns string
+	if d.Mail.known() {
+		dns = "mail dns " + cachedAgo(time.Duration(d.Mail.AgeS)*time.Second)
 	}
 	return join(
 		fmt.Sprintf("origin %.2f ms", d.Origin.MS),
-		dmarc,
+		dns,
 		d.Origin.Go,
 		fmt.Sprintf("%d goroutines", d.Origin.Goroutines),
 		fmt.Sprintf("%.1f MB heap", float64(d.Origin.HeapBytes)/1e6),
@@ -200,6 +226,13 @@ func prefix(p, v string) string {
 		return ""
 	}
 	return p + v
+}
+
+func flag(name string, on bool) string {
+	if !on {
+		return ""
+	}
+	return name
 }
 
 func serverTiming(d time.Duration) string {

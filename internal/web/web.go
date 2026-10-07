@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"vinpatel.org/site/internal/config"
+	"vinpatel.org/site/internal/resolve"
 )
 
 //go:embed templates static
@@ -27,9 +28,9 @@ var content embed.FS
 
 // Lookup is the DNS knowledge the page needs; *resolve.Resolver satisfies it.
 type Lookup interface {
-	// DMARCPolicy returns the p= value of the domain's DMARC record and how
-	// long ago it was fetched. Both are zero when unknown.
-	DMARCPolicy(ctx context.Context, domain string) (policy string, age time.Duration)
+	// Mail is what a sending server would find for domain, with selector
+	// as the DKIM selector to check. Unknown parts are zero.
+	Mail(ctx context.Context, domain, selector string) resolve.Mail
 	ASOrg(ctx context.Context, asn uint32) string
 }
 
@@ -48,7 +49,6 @@ type site struct {
 	lookup   Lookup
 	log      *slog.Logger
 	tmpl     *template.Template
-	policy   string
 	security string
 }
 
@@ -76,7 +76,6 @@ func New(o Options) (http.Handler, error) {
 		lookup:   o.Lookup,
 		log:      o.Logger,
 		tmpl:     tmpl,
-		policy:   mtaSTSPolicy(o.Config),
 		security: securityTXT(o.Config.SiteHost, o.BuildTime),
 	}
 
@@ -105,22 +104,19 @@ func New(o Options) (http.Handler, error) {
 }
 
 // route answers /healthz on every host so the loopback healthcheck works,
-// then splits by host: the apex mux, the MTA-STS policy, and a permanent
-// redirect to the apex for anything else, www included.
+// then splits by host: the apex mux, and a permanent redirect to the apex
+// for anything else, www included.
 func (s *site) route(apex http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/healthz" {
 			text(w, http.StatusOK, "ok\n", "no-store")
 			return
 		}
-		switch hostname(r.Host) {
-		case s.cfg.SiteHost:
+		if hostname(r.Host) == s.cfg.SiteHost {
 			apex.ServeHTTP(w, r)
-		case s.cfg.MTASTSHost():
-			s.mtaSTS(w, r)
-		default:
-			http.Redirect(w, r, "https://"+s.cfg.SiteHost+r.URL.RequestURI(), http.StatusPermanentRedirect)
+			return
 		}
+		http.Redirect(w, r, "https://"+s.cfg.SiteHost+r.URL.RequestURI(), http.StatusPermanentRedirect)
 	})
 }
 
@@ -130,25 +126,6 @@ func hostname(hostport string) string {
 		host = h
 	}
 	return strings.TrimSuffix(strings.ToLower(host), ".")
-}
-
-func (s *site) mtaSTS(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/.well-known/mta-sts.txt" {
-		text(w, http.StatusNotFound, "not found\n", "no-store")
-		return
-	}
-	text(w, http.StatusOK, s.policy, "max-age=300")
-}
-
-func mtaSTSPolicy(c config.Config) string {
-	var b strings.Builder
-	b.WriteString("version: STSv1\r\n")
-	fmt.Fprintf(&b, "mode: %s\r\n", c.MTASTSMode)
-	for _, mx := range c.MTASTSMX {
-		fmt.Fprintf(&b, "mx: %s\r\n", mx)
-	}
-	fmt.Fprintf(&b, "max_age: %d\r\n", c.MTASTSMaxAge)
-	return b.String()
 }
 
 // securityTXT expires 364 days after the build, inside RFC 9116's one-year
