@@ -44,9 +44,14 @@ resource "cloudflare_zone_setting" "nel" {
 # Bot Fight Mode keeps JavaScript Detections on, and the API refuses to
 # switch them off alone. The page and the fallback card send
 # Cache-Control: no-transform instead, which keeps the detection script out
-# of them.
+# of them. Cloudflare retired the single AI bot block on 2026-09-15 and
+# writes to it no longer stick; these presets replace it and block AI
+# search, agent and training bots.
 resource "cloudflare_bot_management" "site" {
-  zone_id    = local.zone_id
-  enable_js  = true
-  fight_mode = true
+  zone_id     = local.zone_id
+  enable_js   = true
+  fight_mode  = true
+  aisearch    = "block"
+  ai_user     = "block"
+  ai_training = "block"
 }
