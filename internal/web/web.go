@@ -50,6 +50,7 @@ type site struct {
 	log      *slog.Logger
 	tmpl     *template.Template
 	security string
+	latency  histogram
 }
 
 func New(o Options) (http.Handler, error) {

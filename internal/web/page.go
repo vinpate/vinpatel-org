@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"runtime/metrics"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -76,9 +77,13 @@ func (m mailRow) String() string {
 }
 
 // originRow describes the process that answered: how long it spent on
-// parsing and lookups, and what it is running on.
+// parsing and lookups for this request, the p50 and p99 of that time over
+// every page and trace since it started, and what it is running on.
 type originRow struct {
 	MS         float64 `json:"ms"`
+	P50MS      float64 `json:"p50_ms,omitempty"`
+	P99MS      float64 `json:"p99_ms,omitempty"`
+	Requests   uint64  `json:"requests"`
 	Go         string  `json:"go"`
 	Goroutines int     `json:"goroutines"`
 	HeapBytes  uint64  `json:"heap_bytes"`
@@ -118,7 +123,9 @@ func (s *site) traceJSON(w http.ResponseWriter, r *http.Request) {
 }
 
 // trace gathers what the edge and DNS say about this request. Origin.MS
-// covers parsing and lookups; Server-Timing on the response adds rendering.
+// and the percentiles both cover parsing and lookups, and this request
+// joins the histogram only after it is read, so no response counts
+// itself. Server-Timing on the response adds rendering.
 func (s *site) trace(r *http.Request, start time.Time) traceDoc {
 	t := edge.Parse(r.Header)
 	var org string
@@ -144,12 +151,18 @@ func (s *site) trace(r *http.Request, start time.Time) traceDoc {
 	if t.ASN != 0 || t.City != "" || t.Country != "" {
 		doc.From = &fromRow{ASN: t.ASN, ASOrg: org, City: t.City, Country: t.Country}
 	}
+	d := time.Since(start)
+	snap := s.latency.snapshot()
 	doc.Origin = originRow{
-		MS:         millis(time.Since(start)),
+		MS:         millis(d),
+		P50MS:      millis(snap.quantile(0.5)),
+		P99MS:      millis(snap.quantile(0.99)),
+		Requests:   snap.total,
 		Go:         runtime.Version(),
 		Goroutines: runtime.NumGoroutine(),
 		HeapBytes:  heapBytes(),
 	}
+	s.latency.observe(d)
 	return doc
 }
 
@@ -186,20 +199,41 @@ func (d traceDoc) Rows() []row {
 	return rows
 }
 
-// OriginLine is the page's footer: what answered, and how fresh its DNS
-// knowledge is.
-func (d traceDoc) OriginLine() string {
+// TimingLine is the footer's first line: this response, then every page
+// and trace since the process started.
+func (d traceDoc) TimingLine() string {
+	var since string
+	if d.Origin.Requests > 0 {
+		noun := "requests"
+		if d.Origin.Requests == 1 {
+			noun = "request"
+		}
+		since = fmt.Sprintf("p50 %.2f ms · p99 %.2f ms over %s %s", d.Origin.P50MS, d.Origin.P99MS, commas(d.Origin.Requests), noun)
+	}
+	return join(fmt.Sprintf("origin %.2f ms", d.Origin.MS), since)
+}
+
+// RuntimeLine is the footer's second line: how fresh the DNS knowledge is
+// and what the process runs on.
+func (d traceDoc) RuntimeLine() string {
 	var dns string
 	if d.Mail.known() {
 		dns = "mail dns " + cachedAgo(time.Duration(d.Mail.AgeS)*time.Second)
 	}
 	return join(
-		fmt.Sprintf("origin %.2f ms", d.Origin.MS),
 		dns,
 		d.Origin.Go,
 		fmt.Sprintf("%d goroutines", d.Origin.Goroutines),
 		fmt.Sprintf("%.1f MB heap", float64(d.Origin.HeapBytes)/1e6),
 	)
+}
+
+func commas(n uint64) string {
+	s := strconv.FormatUint(n, 10)
+	for i := len(s) - 3; i > 0; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	return s
 }
 
 func cachedAgo(age time.Duration) string {

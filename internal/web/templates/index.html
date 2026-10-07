@@ -33,11 +33,12 @@
     </dl>
   </section>
 
-  <p class="note">Mail from this domain is DKIM signed and DMARC enforced. Anything claiming to be from {{.Site}} that fails those checks did not come from me. Nothing on this page is stored; it is your own request, reflected.</p>
+  <p class="note">Mail from this domain is DKIM signed and DMARC enforced. Anything claiming to be from {{.Site}} that fails those checks did not come from me. The origin never logs your address, browser or referrer; what you see above is your own request, reflected.</p>
 </main>
 <footer>
   <p><a href="/trace"><code>GET /trace</code></a> · <a href="https://github.com/vinpate/vinpatel-org">source</a></p>
-  <p class="origin">{{.Trace.OriginLine}}</p>
+  <p class="timing">{{.Trace.TimingLine}}</p>
+  <p class="runtime">{{.Trace.RuntimeLine}}</p>
 </footer>
 </body>
 </html>

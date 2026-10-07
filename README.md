@@ -3,9 +3,11 @@
 The site behind `mail@vinpatel.org`. It is one page that reflects your own
 request as it reached Cloudflare: the data center that answered, the HTTP
 and TLS versions you negotiated, the network you came from, the build that
-rendered the page, and the domain's mail setup. The footer adds a line
-about the origin itself: how long it took to answer, the Go version, and
-the goroutines and memory in use. `GET /trace` returns the same data as
+rendered the page, and the domain's mail setup. The footer adds two
+lines about the origin itself: how long it spent preparing this
+response, beside the p50 and p99 of every page and trace since it
+started, then how old its mail DNS answers are, the Go version, and the
+goroutines and memory in use. `GET /trace` returns the same data as
 JSON.
 
 ## How it runs
