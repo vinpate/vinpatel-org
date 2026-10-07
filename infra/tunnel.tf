@@ -21,7 +21,6 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "web" {
     ingress = [
       { hostname = local.hosts.apex, service = local.origin },
       { hostname = local.hosts.www, service = local.origin },
-      { hostname = local.hosts.mta_sts, service = local.origin },
       { service = "http_status:404" },
     ]
   }

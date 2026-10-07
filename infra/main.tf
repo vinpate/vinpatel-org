@@ -8,9 +8,8 @@ locals {
   zone_id = data.cloudflare_zone.site.id
   origin  = "http://web:8080"
   hosts = {
-    apex    = var.zone_name
-    www     = "www.${var.zone_name}"
-    mta_sts = "mta-sts.${var.zone_name}"
+    apex = var.zone_name
+    www  = "www.${var.zone_name}"
   }
 }
 

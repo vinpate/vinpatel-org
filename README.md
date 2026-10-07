@@ -24,6 +24,9 @@ visitor ─HTTPS─▶ Cloudflare edge ─▶ fallback Worker ─▶ Tunnel ─�
   scripts or third-party requests.
 - When the origin is unreachable, a Cloudflare Worker serves a static
   contact card instead of an error page.
+- The MTA-STS policy is served by a second Worker from text Terraform
+  builds, so it stays fetchable while the origin is down and its DNS
+  `id` changes with it.
 - `compose.yaml` is the whole runtime and `infra/` declares the Cloudflare
   side in Terraform, so moving to another Docker host needs no DNS change.
 
@@ -37,7 +40,8 @@ visitor ─HTTPS─▶ Cloudflare edge ─▶ fallback Worker ─▶ Tunnel ─�
 | `internal/resolve` | DNS-over-HTTPS TXT lookups behind a bounded, coalescing cache |
 | `internal/web` | routes, middleware, the template and the stylesheet |
 | `edge/fallback.js` | the Worker that serves the offline card |
-| `infra/` | tunnel, DNS, transform and redirect rules, zone settings, Worker |
+| `edge/mta-sts.js` | the Worker that serves the mail policy |
+| `infra/` | tunnel, DNS including the mail records, transform and redirect rules, zone settings, Workers |
 | `compose.yaml` | `web` and `cloudflared` |
 | `Dockerfile` | two-stage build to a `scratch` image |
 | `scripts/` | the image smoke test and the tunnel token helper |
@@ -48,7 +52,7 @@ visitor ─HTTPS─▶ Cloudflare edge ─▶ fallback Worker ─▶ Tunnel ─�
 ```sh
 mise install
 go test -race ./...
-node --test edge/fallback.test.js
+node --test "edge/*.test.js"
 SITE_HOST=localhost DOH_URL= go run ./cmd/server    # then open http://localhost:8080
 ```
 
@@ -61,7 +65,7 @@ Secrets never live in the repository. The `op://` references in
 1Password CLI fills them in at run time.
 
 ```sh
-op run --env-file infra/op.env -- terraform -chdir=infra apply   # tunnel, DNS, rules, Worker
+op run --env-file infra/op.env -- terraform -chdir=infra apply   # tunnel, DNS, rules, Workers
 op run --env-file infra/op.env -- scripts/tunnel-token.sh        # store the tunnel's connector token
 op inject -i .env.tpl -o .env                                    # render the environment file
 docker compose up -d                                             # start web and cloudflared
