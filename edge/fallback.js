@@ -1,3 +1,7 @@
+// Runs on every request to the apex. It passes the request through to the
+// origin and, when the origin is unreachable or answers 5xx, serves the
+// contact card below instead, so the mail address stays one click away.
+// STYLE_HASH is the CSP hash of STYLE; the tests fail if they drift.
 const STYLE = `
 :root{--paper:#EFEFEA;--ink:#232722;--moss:#4C6A4F;--stone:#646860;color-scheme:light dark}
 @media (prefers-color-scheme:dark){:root{--paper:#1C201B;--ink:#E6E7E1;--moss:#9BBE9C;--stone:#91958C}}
