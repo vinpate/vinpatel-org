@@ -50,7 +50,14 @@ type site struct {
 	log      *slog.Logger
 	tmpl     *template.Template
 	security string
+	head     head
 	latency  histogram
+}
+
+// head is what the page's <head> and JSON-LD say; fixed for the process.
+type head struct {
+	Title, Description string
+	JSONLD             template.JS
 }
 
 func New(o Options) (http.Handler, error) {
@@ -69,6 +76,10 @@ func New(o Options) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
+	ld, err := vin.jsonLD(o.Config.SiteHost)
+	if err != nil {
+		return nil, fmt.Errorf("web: %w", err)
+	}
 
 	s := &site{
 		cfg:      o.Config,
@@ -78,6 +89,7 @@ func New(o Options) (http.Handler, error) {
 		log:      o.Logger,
 		tmpl:     tmpl,
 		security: securityTXT(o.Config.SiteHost, o.BuildTime),
+		head:     head{Title: vin.title(), Description: vin.description(o.Config.SiteHost), JSONLD: template.JS(ld)},
 	}
 
 	apex := http.NewServeMux()

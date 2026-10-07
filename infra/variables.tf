@@ -36,3 +36,9 @@ variable "mta_sts_max_age" {
     error_message = "mta_sts_max_age must be between 1 and 31557600 seconds."
   }
 }
+
+variable "google_site_verification" {
+  description = "Search Console verification token for the apex TXT record, with or without the google-site-verification= prefix; empty for none."
+  type        = string
+  default     = ""
+}

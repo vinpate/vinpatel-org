@@ -22,8 +22,9 @@ visitor ─HTTPS─▶ Cloudflare edge ─▶ fallback Worker ─▶ Tunnel ─�
 - The host publishes no ports. `cloudflared` dials out to Cloudflare and
   nothing dials in.
 - The origin drops visitor IP headers before any handler runs and never
-  logs an IP address, user agent or referrer. There are no cookies,
-  scripts or third-party requests.
+  logs an IP address, user agent or referrer. There are no cookies, no
+  JavaScript and no third-party requests; the one `script` element is a
+  JSON-LD description of the page for search engines.
 - When the origin is unreachable, a Cloudflare Worker serves a static
   contact card instead of an error page.
 - The MTA-STS policy is served by a second Worker from text Terraform

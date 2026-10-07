@@ -24,14 +24,14 @@ const CARD = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Vin Patel</title>
+<title>Vin Patel · infrastructure engineer</title>
 <style>${STYLE}</style>
 </head>
 <body>
 <main>
 <h1>vinpatel.org</h1>
 <p class="name">Vin Patel</p>
-<p class="title"><a href="https://nirvanalabs.io">Co-founding engineer, Nirvana Labs</a></p>
+<p class="title">Infrastructure engineer<br>Co-founding engineer, <a href="https://nirvanalabs.io">Nirvana Labs</a>, 2022–2026</p>
 <dl>
 <dt>mail</dt><dd><a href="mailto:mail@vinpatel.org">mail@vinpatel.org</a></dd>
 <dt>github</dt><dd><a href="https://github.com/vinpate" rel="me">github.com/vinpate</a></dd>

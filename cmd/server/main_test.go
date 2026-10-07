@@ -103,7 +103,7 @@ func TestRunServesUntilCancelled(t *testing.T) {
 	}
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `<h1 class="domain">vinpatel.org</h1>`) {
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `<p class="domain">vinpatel.org</p>`) {
 		t.Fatalf("GET / = %d\n%s", resp.StatusCode, body)
 	}
 

@@ -96,13 +96,15 @@ type row struct {
 }
 
 type page struct {
-	Site  string
-	Trace traceDoc
+	Site    string
+	Profile profile
+	Head    head
+	Trace   traceDoc
 }
 
 func (s *site) index(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	body, err := s.execute("index.html", page{Site: s.cfg.SiteHost, Trace: s.trace(r, start)})
+	body, err := s.execute("index.html", page{Site: s.cfg.SiteHost, Profile: vin, Head: s.head, Trace: s.trace(r, start)})
 	if err != nil {
 		s.fail(w, err)
 		return

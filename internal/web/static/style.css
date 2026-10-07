@@ -56,9 +56,11 @@ main, footer {
   line-height: 1.1;
 }
 
-.name { margin: 2.25rem 0 0; font-weight: 600; }
+.name { margin: 2.25rem 0 0; font-size: inherit; font-weight: 600; line-height: inherit; }
 
-.title { margin: 0 0 1.25rem; color: var(--stone); }
+.title { margin: 0; color: var(--stone); }
+
+.former { margin: 0 0 1.25rem; color: var(--stone); }
 
 .bio { margin: 0 0 2.5rem; }
 

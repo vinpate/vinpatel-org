@@ -38,7 +38,7 @@ func TestIndexReflectsTheRequest(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
-		`<h1 class="domain">vinpatel.org</h1>`,
+		`<p class="domain">vinpatel.org</p>`,
 		`<dt>served</dt><dd>SJC · ray 8c1f2a3b4d5e6f70-SJC</dd>`,
 		`<dt>proto</dt><dd>HTTP/3 · TLSv1.3</dd>`,
 		`<dt>from</dt><dd>AS13335 · CLOUDFLARENET - Cloudflare, Inc., US · San Jose, US</dd>`,
@@ -280,8 +280,11 @@ func TestPageStaysSmallAndSelfContained(t *testing.T) {
 	if total := len(page) + len(css) + len(icon); total > 15*1024 {
 		t.Errorf("page weight = %d bytes, budget is 15360", total)
 	}
-	if strings.Contains(page, "<script") || strings.Contains(page, " style=") {
-		t.Error("page has script or inline style, which the CSP forbids")
+	if n := strings.Count(page, "<script"); n != 1 || !strings.Contains(page, `<script type="application/ld+json">`) {
+		t.Errorf("page has %d script elements; only the JSON-LD data block is allowed", n)
+	}
+	if strings.Contains(page, " style=") {
+		t.Error("page has an inline style, which the CSP forbids")
 	}
 	for _, m := range regexp.MustCompile(`<link [^>]*href="([^"]+)"`).FindAllStringSubmatch(page, -1) {
 		if !strings.HasPrefix(m[1], "/") && m[1] != "https://vinpatel.org/" {

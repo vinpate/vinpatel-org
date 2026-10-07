@@ -3,25 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vin Patel</title>
-<meta name="description" content="Vin Patel, distributed systems engineer. Reach me at mail@{{.Site}}.">
+<title>{{.Head.Title}}</title>
+<meta name="description" content="{{.Head.Description}}">
 <link rel="canonical" href="https://{{.Site}}/">
+<meta property="og:type" content="profile">
+<meta property="og:title" content="{{.Head.Title}}">
+<meta property="og:description" content="{{.Head.Description}}">
+<meta property="og:url" content="https://{{.Site}}/">
+<meta property="profile:first_name" content="{{.Profile.GivenName}}">
+<meta property="profile:last_name" content="{{.Profile.FamilyName}}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
+<script type="application/ld+json">{{.Head.JSONLD}}</script>
 </head>
 <body>
 <main>
-  <h1 class="domain">{{.Site}}</h1>
-  <p class="name">Vin Patel</p>
-  <p class="title"><a href="https://nirvanalabs.io">Co-founding engineer, Nirvana Labs</a></p>
-  <p class="bio">I build distributed systems: the storage, replication and coordination layers other software assumes just work. Co-founding engineer at Nirvana Labs. This domain exists so my mail comes from somewhere that is mine.</p>
+  <p class="domain">{{.Site}}</p>
+  <h1 class="name">{{.Profile.Name}}</h1>
+  <p class="title">{{.Profile.Role}}</p>
+  <p class="former">{{.Profile.Former.Title}}, <a href="{{.Profile.Former.URL}}">{{.Profile.Former.Org}}</a>, {{.Profile.Former.From}}–{{.Profile.Former.To}}</p>
+  <p class="bio">{{.Profile.Bio}}</p>
 
   <dl class="records">
     <dt>mail</dt><dd><a href="mailto:mail@{{.Site}}">mail@{{.Site}}</a></dd>
-    <dt>github</dt><dd><a href="https://github.com/vinpate" rel="me">github.com/vinpate</a></dd>
-    <dt>linkedin</dt><dd><a href="https://www.linkedin.com/in/vin-pate" rel="me">linkedin.com/in/vin-pate</a></dd>
-    <dt>bluesky</dt><dd><a href="https://bsky.app/profile/vinfa.bsky.social" rel="me">bsky.app/profile/vinfa.bsky.social</a></dd>
-    <dt>photos</dt><dd><a href="https://www.instagram.com/vinfral7" rel="me">instagram.com/vinfral7</a></dd>
+    {{- range .Profile.Links}}
+    <dt>{{.Label}}</dt><dd><a href="{{.URL}}" rel="me">{{.Text}}</a></dd>
+    {{- end}}
   </dl>
 
   <section class="request" aria-labelledby="request">

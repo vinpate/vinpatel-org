@@ -28,3 +28,13 @@ moved {
   from = cloudflare_dns_record.site["mta_sts"]
   to   = cloudflare_dns_record.mta_sts
 }
+
+resource "cloudflare_dns_record" "google_site_verification" {
+  count = var.google_site_verification == "" ? 0 : 1
+
+  zone_id = local.zone_id
+  name    = var.zone_name
+  type    = "TXT"
+  content = "\"google-site-verification=${trimprefix(var.google_site_verification, "google-site-verification=")}\""
+  ttl     = 3600
+}
