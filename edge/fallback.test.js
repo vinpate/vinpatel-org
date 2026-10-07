@@ -40,7 +40,7 @@ test("serves the card when the origin is unreachable", async () => {
 test("card carries cache and security headers", async () => {
   upstream = () => new Response(null, { status: 530 });
   const response = await visit();
-  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(response.headers.get("cache-control"), "no-store, no-transform");
   assert.equal(response.headers.get("retry-after"), "300");
   for (const name of [
     "strict-transport-security",

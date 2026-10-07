@@ -174,7 +174,7 @@ func (s *site) notFound(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	writeBody(w, http.StatusNotFound, "text/html; charset=utf-8", "no-store", body)
+	writeBody(w, http.StatusNotFound, "text/html; charset=utf-8", "no-store, no-transform", body)
 }
 
 func (s *site) execute(name string, data any) ([]byte, error) {

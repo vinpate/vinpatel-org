@@ -62,7 +62,7 @@ func TestIndexReflectsTheRequest(t *testing.T) {
 		t.Errorf("page lacks the footer lines:\n%s", body)
 	}
 	h := rec.Header()
-	if got := h.Get("Cache-Control"); got != "private, no-store" {
+	if got := h.Get("Cache-Control"); got != "private, no-store, no-transform" {
 		t.Errorf("Cache-Control = %q", got)
 	}
 	if got := h.Get("Content-Length"); got != strconv.Itoa(len(body)) {

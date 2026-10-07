@@ -133,6 +133,18 @@ func TestRoutes(t *testing.T) {
 	}
 }
 
+// Cloudflare injects its bot detection script into HTML unless the response
+// says no-transform.
+func TestHTMLIsNeverTransformed(t *testing.T) {
+	h := newHandler(t, testOptions(t))
+	for _, target := range []string{"/", "/wp-login.php"} {
+		rec := serve(h, http.MethodGet, "vinpatel.org", target, edgeHeaders)
+		if got := rec.Header().Get("Cache-Control"); !strings.Contains(got, "no-transform") {
+			t.Errorf("%s: Cache-Control = %q, want no-transform", target, got)
+		}
+	}
+}
+
 func TestSecurityTXT(t *testing.T) {
 	rec := serve(newHandler(t, testOptions(t)), http.MethodGet, "vinpatel.org", "/.well-known/security.txt", nil)
 	want := "Contact: mailto:mail@vinpatel.org\n" +

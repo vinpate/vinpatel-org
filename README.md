@@ -24,7 +24,8 @@ visitor ─HTTPS─▶ Cloudflare edge ─▶ fallback Worker ─▶ Tunnel ─�
 - The origin drops visitor IP headers before any handler runs and never
   logs an IP address, user agent or referrer. There are no cookies, no
   JavaScript and no third-party requests; the one `script` element is a
-  JSON-LD description of the page for search engines.
+  JSON-LD description of the page for search engines. HTML responses say
+  `Cache-Control: no-transform`, so Cloudflare injects nothing into them.
 - When the origin is unreachable, a Cloudflare Worker serves a static
   contact card instead of an error page.
 - The MTA-STS policy is served by a second Worker from text Terraform

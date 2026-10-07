@@ -110,7 +110,7 @@ func (s *site) index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Server-Timing", serverTiming(time.Since(start)))
-	writeBody(w, http.StatusOK, "text/html; charset=utf-8", "private, no-store", body)
+	writeBody(w, http.StatusOK, "text/html; charset=utf-8", "private, no-store, no-transform", body)
 }
 
 func (s *site) traceJSON(w http.ResponseWriter, r *http.Request) {

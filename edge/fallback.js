@@ -47,7 +47,7 @@ const CARD = `<!doctype html>
 
 const HEADERS = {
   "Content-Type": "text/html; charset=utf-8",
-  "Cache-Control": "no-store",
+  "Cache-Control": "no-store, no-transform",
   "Retry-After": "300",
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
   "Content-Security-Policy": `default-src 'none'; style-src '${STYLE_HASH}'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
