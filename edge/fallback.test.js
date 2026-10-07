@@ -74,3 +74,23 @@ test("CSP allows exactly the card's inline stylesheet", async () => {
   const csp = response.headers.get("content-security-policy");
   assert.ok(csp.includes(`style-src '${hash}'`), `CSP must allow '${hash}', got: ${csp}`);
 });
+
+test("icon requests get 204 during an outage, not the card", async () => {
+  upstream = () => {
+    throw new TypeError("fetch failed");
+  };
+  for (const path of ["/favicon.ico", "/favicon.svg"]) {
+    const response = await worker.fetch(new Request(`https://vinpatel.org${path}`));
+    assert.equal(response.status, 204, path);
+    assert.equal(await response.text(), "");
+    assert.equal(response.headers.get("cache-control"), "no-store");
+  }
+  const page = await worker.fetch(new Request("https://vinpatel.org/favicon.png"));
+  assert.equal(page.status, 503);
+});
+
+test("icon requests reach the origin when it is up", async () => {
+  const origin = new Response("<svg/>", { status: 200 });
+  upstream = () => origin;
+  assert.equal(await worker.fetch(new Request("https://vinpatel.org/favicon.svg")), origin);
+});

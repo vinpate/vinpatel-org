@@ -59,6 +59,10 @@ const HEADERS = {
   "Cross-Origin-Resource-Policy": "same-origin",
 };
 
+// Browsers ask for an icon on their own; during an outage that request
+// would get the card and a console error.
+const ICONS = new Set(["/favicon.ico", "/favicon.svg"]);
+
 export default {
   async fetch(request) {
     try {
@@ -69,6 +73,9 @@ export default {
       await response.body?.cancel();
     } catch {
       // Unreachable origin: fall through to the card.
+    }
+    if (ICONS.has(new URL(request.url).pathname)) {
+      return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
     }
     return new Response(request.method === "HEAD" ? null : CARD, { status: 503, headers: HEADERS });
   },
