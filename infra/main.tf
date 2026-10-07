@@ -24,3 +24,19 @@ resource "cloudflare_zone_setting" "always_use_https" {
   setting_id = "always_use_https"
   value      = "on"
 }
+
+# The page's CSP has no script-src, so anything Cloudflare injects only
+# produces a console error, like the email obfuscation that would leave
+# "[email protected]" on a 200 page. Network Error Logging asks browsers to
+# report to Cloudflare, which the page's note does not admit to.
+resource "cloudflare_zone_setting" "email_obfuscation" {
+  zone_id    = local.zone_id
+  setting_id = "email_obfuscation"
+  value      = "off"
+}
+
+resource "cloudflare_zone_setting" "nel" {
+  zone_id    = local.zone_id
+  setting_id = "nel"
+  value      = { enabled = false }
+}
