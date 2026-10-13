@@ -42,3 +42,56 @@ variable "google_site_verification" {
   type        = string
   default     = ""
 }
+
+variable "tenancy_ocid" {
+  description = "OCI tenancy; also the compartment that holds the budget."
+  type        = string
+}
+
+variable "user_ocid" {
+  description = "OCI user whose API key Terraform signs requests with."
+  type        = string
+}
+
+variable "fingerprint" {
+  description = "Fingerprint of that API key."
+  type        = string
+}
+
+variable "private_key" {
+  description = "PEM private key of that API key."
+  type        = string
+  sensitive   = true
+}
+
+variable "region" {
+  description = "OCI home region; Always Free compute exists only there."
+  type        = string
+  default     = "us-ashburn-1"
+}
+
+variable "compartment_ocid" {
+  description = "Compartment for the network and the host."
+  type        = string
+}
+
+variable "ssh_public_key" {
+  description = "OpenSSH public key for the ubuntu user and the serial console connection."
+  type        = string
+}
+
+variable "ssh_cidr" {
+  description = "Only source allowed to reach the host's SSH port."
+  type        = string
+
+  validation {
+    condition     = can(cidrhost(var.ssh_cidr, 0)) && !endswith(var.ssh_cidr, "/0")
+    error_message = "ssh_cidr must be a CIDR narrower than /0."
+  }
+}
+
+variable "budget_email" {
+  description = "Recipient of the budget alert."
+  type        = string
+  default     = "mail@vinpatel.org"
+}

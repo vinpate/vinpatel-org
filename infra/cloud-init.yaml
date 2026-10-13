@@ -1,0 +1,69 @@
+#cloud-config
+# Turns a fresh Ubuntu VM into the vinpatel.org host. It carries no
+# secrets: scripts/host-env.sh delivers .env and the GHCR login over SSH,
+# and until then the update service has nothing to start.
+
+apt:
+  sources:
+    docker.list:
+      source: deb [signed-by=$KEY_FILE] https://download.docker.com/linux/ubuntu $RELEASE stable
+      keyid: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
+
+package_update: true
+packages:
+  - ca-certificates
+  - containerd.io
+  - docker-ce
+  - docker-ce-cli
+  - docker-compose-plugin
+  - git
+  - unattended-upgrades
+
+write_files:
+  # sshd keeps the first value it reads, so this sorts before cloud-init's
+  # and the image's own drop-ins.
+  - path: /etc/ssh/sshd_config.d/10-vinpatel-org.conf
+    content: |
+      PasswordAuthentication no
+      PermitRootLogin no
+  # Docker's packages are not in Ubuntu's archive, so they need their own
+  # origin to be upgraded unattended.
+  - path: /etc/apt/apt.conf.d/52vinpatel-org
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      Unattended-Upgrade::Origins-Pattern { "origin=Docker"; };
+  - path: /etc/systemd/system/vinpatel-org-update.service
+    content: |
+      [Unit]
+      Description=Pull vinpatel.org and restart it on any change
+      Wants=network-online.target
+      After=network-online.target docker.service
+      Requires=docker.service
+      ConditionPathExists=/opt/vinpatel-org/.env
+
+      [Service]
+      Type=oneshot
+      WorkingDirectory=/opt/vinpatel-org
+      ExecStart=/usr/bin/git pull --ff-only
+      ExecStart=/usr/bin/docker compose pull
+      ExecStart=/usr/bin/docker compose up -d --remove-orphans
+      ExecStart=/usr/bin/docker image prune -f
+  - path: /etc/systemd/system/vinpatel-org-update.timer
+    content: |
+      [Unit]
+      Description=Update vinpatel.org hourly
+
+      [Timer]
+      OnCalendar=hourly
+      RandomizedDelaySec=10m
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+
+runcmd:
+  - [git, clone, "https://github.com/vinpate/vinpatel-org", /opt/vinpatel-org]
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, --now, vinpatel-org-update.timer]
+  - [systemctl, try-restart, ssh.service]
