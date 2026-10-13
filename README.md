@@ -50,8 +50,8 @@ visitor ─HTTPS─▶ Cloudflare edge ─▶ fallback Worker ─▶ Tunnel ─�
 | `internal/resolve` | DNS-over-HTTPS lookups, the cache and the mail posture |
 | `internal/web` | routes, middleware, the page, its template and stylesheet |
 | `edge/` | the two Workers and their tests |
-| `infra/` | the Cloudflare side, in Terraform |
-| `scripts/` | the image smoke test and the tunnel token helper |
+| `infra/` | the Cloudflare side and the Oracle Cloud host, in Terraform |
+| `scripts/` | the image smoke test and the tunnel token and host secret helpers |
 | `.github/` | CI and Dependabot |
 
 A request enters at `internal/web/web.go`, passes the handlers in
@@ -72,20 +72,29 @@ SITE_HOST=localhost DOH_URL= go run ./cmd/server    # then open http://localhost
 ## Deploy
 
 Secrets stay in 1Password: `infra/op.env` and `.env.tpl` hold only
-`op://` references, filled in at run time.
+`op://` references, filled in at run time. No secret enters Terraform
+state or the host's metadata.
 
 ```sh
 terraform -chdir=infra init
-op run --env-file infra/op.env -- terraform -chdir=infra apply   # tunnel, DNS, rules, Workers
-op run --env-file infra/op.env -- scripts/tunnel-token.sh        # store the tunnel's connector token
-op inject -i .env.tpl -o .env                                    # render the environment file
-docker compose up -d                                             # start web and cloudflared
+op run --env-file infra/op.env -- terraform -chdir=infra apply       # tunnel, DNS, rules, Workers, host
+op run --env-file infra/op.env -- scripts/tunnel-token.sh            # store the tunnel's connector token
+scripts/host-env.sh "$(terraform -chdir=infra output -raw host_ip)"  # send .env and the GHCR login, start
 ```
 
-The host needs Docker and the 1Password CLI, and Terraform for the first
-three commands. Every merge to `main` publishes
-`ghcr.io/vinpate/vinpatel-org:sha-<commit>` and `:latest`; set `IMAGE_TAG`
-in `.env` to pin one.
+The host is an Oracle Cloud Always Free VM that accepts SSH only from
+`ssh_cidr` (`infra/host.tf`). cloud-init installs Docker and clones this
+repository (`infra/cloud-init.yaml`), so the host needs neither Terraform
+nor the 1Password CLI; these commands run from a machine with both and
+SSH. `scripts/host-env.sh` sends the rendered `.env` and a GHCR login
+with a classic `read:packages` token; rerun it whenever Terraform
+replaces the VM.
+
+Every merge to `main` publishes `ghcr.io/vinpate/vinpatel-org:sha-<commit>`
+and `:latest`. An hourly timer on the host pulls this repository and the
+images and restarts what changed, so new images and Dependabot's
+cloudflared bumps land within about an hour; set `IMAGE_TAG` in the host's
+`.env` to pin one.
 
 ## Verify a build
 
