@@ -13,8 +13,9 @@ version, goroutines and heap. `GET /trace` returns the same as JSON.
 visitor ─HTTPS─▶ Cloudflare edge ─▶ fallback Worker ─▶ Tunnel ─▶ cloudflared ─▶ web
 ```
 
-- **Nothing dials in.** The host publishes no ports; `cloudflared` dials
-  out to Cloudflare (`compose.yaml`).
+- **No public inbound ports.** The containers publish no ports;
+  `cloudflared` dials out to Cloudflare (`compose.yaml`). The VM accepts
+  only SSH, and only from `ssh_cidr` (`infra/host.tf`).
 - **A small, locked-down origin.** `web` uses only Go's standard library,
   ships as a `scratch` image and runs unprivileged on a read-only
   filesystem with no capabilities. CI smoke-tests it that way before
