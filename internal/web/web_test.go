@@ -368,7 +368,7 @@ func TestPageIdentityFollowsSiteHost(t *testing.T) {
 	for _, want := range []string{
 		`<a href="mailto:mail@example.org">mail@example.org</a>`,
 		"Reach me at mail@example.org.",
-		"A message from mail@example.org that reached your inbox",
+		"If a message from mail@example.org reached your inbox",
 		"No mail declaration covers example.org, so the mail row shows DNS without comparing it.",
 		"<dt>mail</dt><dd>spf " + allTerm(*o.Declaration) + " · dkim ",
 	} {

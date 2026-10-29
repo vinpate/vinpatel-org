@@ -32,8 +32,8 @@
   </dl>
 
   <p class="verdict">
-    {{- if eq .Trace.Mail.Verdict "confirmed"}}A message from mail@{{.Site}} that reached your inbox at a major provider such as Gmail, Outlook, iCloud or Yahoo was sent from this domain, because the domain tells receivers to reject anything else that uses its address. That does not cover a lookalike domain, or a familiar display name on a different address.
-    {{- else if eq .Trace.Mail.Verdict "weaker"}}Right now this domain does not tell receivers to reject every forged message, so this page makes no claim about mail from mail@{{.Site}}.
+    {{- if eq .Trace.Mail.Verdict "confirmed"}}If a message from mail@{{.Site}} reached your inbox at a major provider like Gmail, Outlook, iCloud or Yahoo, it came from this domain. The domain tells providers to reject every forged message. That does not cover lookalike domains, or a familiar sender name on a different address.
+    {{- else if eq .Trace.Mail.Verdict "weaker"}}Right now this domain does not tell providers to reject every forged message, so this page makes no claim about mail from mail@{{.Site}}.
     {{- else}}This page could not confirm the domain's mail settings right now, so it makes no claim about mail from mail@{{.Site}}.
     {{- end -}}
   </p>

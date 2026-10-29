@@ -21,9 +21,10 @@ import (
 )
 
 const (
-	confirmedSentence = " that reached your inbox at a major provider such as Gmail, Outlook, iCloud or Yahoo was sent from this domain, because the domain tells receivers to reject anything else that uses its address."
-	limitsSentence    = "That does not cover a lookalike domain, or a familiar display name on a different address."
-	weakerSentence    = "Right now this domain does not tell receivers to reject every forged message, so this page makes no claim about mail from mail@"
+	confirmedSentence = "If a message from mail@vinpatel.org reached your inbox at a major provider like Gmail, Outlook, iCloud or Yahoo, it came from this domain."
+	reasonSentence    = "The domain tells providers to reject every forged message."
+	limitsSentence    = "That does not cover lookalike domains, or a familiar sender name on a different address."
+	weakerSentence    = "Right now this domain does not tell providers to reject every forged message, so this page makes no claim about mail from mail@"
 	unconfirmed       = "This page could not confirm the domain's mail settings right now, so it makes no claim about mail from mail@"
 	privacySentence   = "This server never logs your address, browser or referrer; what you see above is your own request, reflected."
 )
@@ -61,7 +62,7 @@ func TestIndexReflectsTheRequest(t *testing.T) {
 		`<dt>from</dt><dd>AS13335 · CLOUDFLARENET - Cloudflare, Inc., US · San Jose, US</dd>`,
 		`<dt>build</dt><dd>abc1234 · <time datetime="2026-10-05T20:00:00Z">2026-10-05</time></dd>`,
 		`<dt>mail</dt><dd>` + fullRow(*o.Declaration) + ` · cached 14m ago</dd>`,
-		`<p class="verdict">A message from mail@vinpatel.org` + confirmedSentence + " " + limitsSentence + `</p>`,
+		`<p class="verdict">` + confirmedSentence + " " + reasonSentence + " " + limitsSentence + `</p>`,
 		`<p class="note">` + privacySentence + `</p>`,
 		`<a href="mailto:mail@vinpatel.org">mail@vinpatel.org</a>`,
 		`<a href="https://github.com/vinpate" rel="me">github.com/vinpate</a>`,
@@ -151,7 +152,7 @@ func TestFreshMailAnswerReadsAsJustNow(t *testing.T) {
 	if !strings.Contains(body, want) {
 		t.Errorf("one answered check should still make a row, the rest unconfirmed; want %s in\n%s", want, body)
 	}
-	if !strings.Contains(body, `<p class="verdict">A message from mail@vinpatel.org`+confirmedSentence) {
+	if !strings.Contains(body, `<p class="verdict">`+confirmedSentence) {
 		t.Errorf("DMARC alone decides the verdict:\n%s", body)
 	}
 }
@@ -168,7 +169,7 @@ func TestWeakerPolicyWithdrawsTheClaim(t *testing.T) {
 			t.Errorf("page lacks %s", want)
 		}
 	}
-	if strings.Contains(body, confirmedSentence) || strings.Contains(body, limitsSentence) {
+	if strings.Contains(body, confirmedSentence) || strings.Contains(body, reasonSentence) || strings.Contains(body, limitsSentence) {
 		t.Errorf("page vouches for mail under p=none:\n%s", body)
 	}
 }
@@ -177,7 +178,7 @@ func TestMissingDKIMKeyKeepsTheVerdict(t *testing.T) {
 	o := withMail(testOptions(t), func(m *resolve.Mail) { m.DKIM, m.Observed.DKIM = "", posture.Absent })
 	body := serve(newHandler(t, o), http.MethodGet, "vinpatel.org", "/", nil).Body.String()
 	for _, want := range []string{
-		`<p class="verdict">A message from mail@vinpatel.org` + confirmedSentence,
+		`<p class="verdict">` + confirmedSentence,
 		" · no dkim (declared " + o.Declaration.DKIM.Selector + ") · ",
 	} {
 		if !strings.Contains(body, want) {
@@ -193,7 +194,7 @@ func TestDeclarationRelaxedAheadOfDNS(t *testing.T) {
 	o.Declaration = &relaxed
 	body := serve(newHandler(t, o), http.MethodGet, "vinpatel.org", "/", nil).Body.String()
 	for _, want := range []string{
-		`<p class="verdict">A message from mail@vinpatel.org` + confirmedSentence,
+		`<p class="verdict">` + confirmedSentence,
 		" · dmarc p=reject (declared none) · ",
 	} {
 		if !strings.Contains(body, want) {
@@ -207,7 +208,7 @@ func TestUnauthenticatedAnswerIsTheResolversWord(t *testing.T) {
 	body := serve(newHandler(t, o), http.MethodGet, "vinpatel.org", "/", nil).Body.String()
 	for _, want := range []string{
 		" · dnssec not authenticated by the resolver · cached 14m ago</dd>",
-		`<p class="verdict">A message from mail@vinpatel.org` + confirmedSentence,
+		`<p class="verdict">` + confirmedSentence,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %s", want)
