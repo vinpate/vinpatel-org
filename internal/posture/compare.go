@@ -26,9 +26,9 @@ func (s State) String() string {
 }
 
 // Verdict is what the page may say about mail from the domain. Only the
-// observed DMARC record decides it: a forgery fails both aligned SPF and
-// aligned DKIM, so p=reject applied in full is what asks receivers to
-// reject it, and the major providers do.
+// observed DMARC record decides it. A forged message fails both aligned SPF
+// and aligned DKIM, so p=reject applied to every message tells receivers to
+// reject it, and the major providers follow that.
 type Verdict uint8
 
 const (
