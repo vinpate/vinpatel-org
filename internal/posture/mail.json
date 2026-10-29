@@ -1,0 +1,23 @@
+{
+  "domain": "vinpatel.org",
+  "mx": ["mx01.mail.icloud.com", "mx02.mail.icloud.com"],
+  "spf": "v=spf1 include:icloud.com ~all",
+  "dkim": {
+    "selector": "sig1",
+    "target": "sig1.dkim.vinpatel.org.at.icloudmailadmin.com"
+  },
+  "dmarc": {
+    "p": "reject",
+    "sp": "reject",
+    "rua": "mailto:f368687a37af4eaba058c173faa5bad4@dmarc-reports.cloudflare.net",
+    "adkim": "s",
+    "aspf": "s"
+  },
+  "mta_sts": {
+    "mode": "testing",
+    "max_age": 604800
+  },
+  "tls_rpt": {
+    "rua": "mailto:mail@vinpatel.org"
+  }
+}

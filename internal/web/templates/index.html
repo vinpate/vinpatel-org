@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Head.Title}}</title>
+<meta name="description" content="{{.Head.Description}}">
+<link rel="canonical" href="https://{{.Site}}/">
+<meta property="og:type" content="profile">
+<meta property="og:title" content="{{.Head.Title}}">
+<meta property="og:description" content="{{.Head.Description}}">
+<meta property="og:url" content="https://{{.Site}}/">
+<meta property="profile:first_name" content="{{.Profile.GivenName}}">
+<meta property="profile:last_name" content="{{.Profile.FamilyName}}">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+<script type="application/ld+json">{{.Head.JSONLD}}</script>
+</head>
+<body>
+<main>
+  <p class="domain">{{.Site}}</p>
+  <h1 class="name">{{.Profile.Name}}</h1>
+  <p class="title">{{.Profile.Role}}</p>
+  <p class="former">{{.Profile.Former.Title}}, <a href="{{.Profile.Former.URL}}">{{.Profile.Former.Org}}</a>, {{.Profile.Former.From}}–{{.Profile.Former.To}}</p>
+  <p class="bio">{{.Profile.Bio}}</p>
+
+  <dl class="records">
+    <dt>mail</dt><dd><a href="mailto:mail@{{.Site}}">mail@{{.Site}}</a></dd>
+    {{- range .Profile.Links}}
+    <dt>{{.Label}}</dt><dd><a href="{{.URL}}" rel="me">{{.Text}}</a></dd>
+    {{- end}}
+  </dl>
+
+  <p class="verdict">
+    {{- if eq .Trace.Mail.Verdict "confirmed"}}A message from mail@{{.Site}} that reached your inbox at a major provider such as Gmail, Outlook, iCloud or Yahoo was sent from this domain, because the domain tells receivers to reject anything else that uses its address. That does not cover a lookalike domain, or a familiar display name on a different address.
+    {{- else if eq .Trace.Mail.Verdict "weaker"}}Right now this domain does not tell receivers to reject every forged message, so this page makes no claim about mail from mail@{{.Site}}.
+    {{- else}}This page could not confirm the domain's mail settings right now, so it makes no claim about mail from mail@{{.Site}}.
+    {{- end -}}
+  </p>
+
+  <section class="request" aria-labelledby="request">
+    <h2 id="request">this request</h2>
+    <dl class="records trace">
+    {{- range .Trace.Rows}}
+      <dt>{{.Key}}</dt><dd>{{.Value}}{{if not .Time.IsZero}} · <time datetime="{{.Time.Format "2006-01-02T15:04:05Z07:00"}}">{{.Time.Format "2006-01-02"}}</time>{{end}}</dd>
+    {{- end}}
+    </dl>
+  </section>
+
+  <p class="note">
+    {{- with .Trace.Mail}}
+    {{- if .Differs}}Where the mail row says “declared”, what was observed differs from what {{with .Commit}}build <a href="https://github.com/vinpate/vinpatel-org/blob/{{.}}/internal/posture/mail.json">{{.}}</a>{{else}}this local build{{end}} declares. {{end}}
+    {{- if .Undeclared}}No mail declaration covers {{$.Site}}, so the mail row shows DNS without comparing it. {{end}}
+    {{- end -}}
+    This server never logs your address, browser or referrer; what you see above is your own request, reflected.</p>
+</main>
+<footer>
+  <p><a href="/trace"><code>GET /trace</code></a> · <a href="https://github.com/vinpate/vinpatel-org">source</a></p>
+  <p class="timing">{{.Trace.TimingLine}}</p>
+  <p class="runtime">{{.Trace.RuntimeLine}}</p>
+</footer>
+</body>
+</html>

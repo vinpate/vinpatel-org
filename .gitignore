@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.worktrees/
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/*.tfplan
+dist/
+
+# Agent tooling, design notes and local scratch scripts never ship.
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+docs/
+scripts/launch.sh
