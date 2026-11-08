@@ -4,6 +4,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # A release waits a week before it is proposed, so a compromised or
+    # withdrawn version has time to be caught upstream.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: build
       include: scope
@@ -11,6 +15,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: ci
       include: scope
