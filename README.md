@@ -31,8 +31,7 @@ visitor ─▶ Cloudflare ─▶ Cloudflare Tunnel ─▶ cloudflared ─▶ ser
 
 ```sh
 mise install
-go test -race ./...
-node --test "edge/*.test.js"
+make test  # every check CI runs
 SITE_HOST=localhost DOH_URL= go run ./cmd/server  # open http://localhost:8080
 ```
 
