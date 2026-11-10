@@ -26,7 +26,7 @@ const (
 	limitsSentence    = "That does not cover lookalike domains, or a familiar sender name on a different address."
 	weakerSentence    = "Right now this domain does not tell providers to reject every forged message, so this page makes no claim about mail from mail@"
 	unconfirmed       = "This page could not confirm the domain's mail settings right now, so it makes no claim about mail from mail@"
-	privacySentence   = "This server never logs your address, browser or referrer; what you see above is your own request, reflected."
+	privacySentence   = "This server never logs your IP, browser or referrer; what you see above is your own request, reflected."
 )
 
 // fullRow is the mail row for DNS that publishes exactly what d declares.
@@ -70,7 +70,7 @@ func TestIndexReflectsTheRequest(t *testing.T) {
 		`<a href="https://bsky.app/profile/vinfa.bsky.social" rel="me">bsky.app/profile/vinfa.bsky.social</a>`,
 		`<a href="https://www.instagram.com/vinfral7" rel="me">instagram.com/vinfral7</a>`,
 		`<a href="https://nirvanalabs.io">`,
-		`This server never logs your address, browser or referrer`,
+		`This server never logs your IP, browser or referrer`,
 		`what you see above is your own request, reflected.`,
 		`<p class="runtime">mail dns cached 14m ago · `,
 	} {

@@ -52,7 +52,7 @@
     {{- if .Differs}}Where the mail row says “declared”, what was observed differs from what {{with .Commit}}build <a href="https://github.com/vinpate/vinpatel-org/blob/{{.}}/internal/posture/mail.json">{{.}}</a>{{else}}this local build{{end}} declares. {{end}}
     {{- if .Undeclared}}No mail declaration covers {{$.Site}}, so the mail row shows DNS without comparing it. {{end}}
     {{- end -}}
-    This server never logs your address, browser or referrer; what you see above is your own request, reflected.</p>
+    This server never logs your IP, browser or referrer; what you see above is your own request, reflected.</p>
 </main>
 <footer>
   <p><a href="/trace"><code>GET /trace</code></a> · <a href="https://github.com/vinpate/vinpatel-org">source</a></p>
