@@ -15,10 +15,29 @@ STATE_ITEM := terraform-state
 STATE      := infra/terraform.tfstate
 BACKUP     := op document edit "$(STATE_ITEM)" "$(STATE)" --vault "$(VAULT)"
 
-.PHONY: help init check-state backup plan show apply
+.PHONY: help test init check-state backup plan show apply
 
 help: ## list the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{ printf "  %-12s %s\n", $$1, $$2 }'
+
+# CI's test job runs this target, so the list of checks lives here alone.
+# gofmt reads only the packages go list finds, which skips any copy of the
+# repository under a dot directory. The smoke test runs a native build; CI's
+# build job smoke-tests the release binary itself.
+test: ## run every check CI runs
+	@set -x
+	dirs=$$(go list -f '{{.Dir}}' ./...)
+	unformatted=$$(gofmt -l $$dirs)
+	if [ -n "$$unformatted" ]; then echo "$$unformatted" >&2; exit 1; fi
+	terraform fmt -check -recursive infra
+	go vet ./...
+	go test -race ./...
+	go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+	node --test "edge/*.test.js"
+	actionlint
+	tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT
+	go build -o "$$tmp/vinpatel-org" ./cmd/server
+	scripts/smoke.sh "$$tmp/vinpatel-org"
 
 init: ## install the providers
 	$(TF) init

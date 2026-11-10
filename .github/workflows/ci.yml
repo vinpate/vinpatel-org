@@ -23,15 +23,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
-      - name: Formatting
-        run: |
-          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
-          terraform fmt -check -recursive infra
-      - run: go vet ./...
-      - run: go test -race ./...
-      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
-      - run: node --test "edge/*.test.js"
-      - run: actionlint
+      - run: make test
 
   # Every run builds and smoke-tests the binaries, with read access alone.
   build:
