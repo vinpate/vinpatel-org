@@ -40,8 +40,7 @@ const CARD = `<!doctype html>
 <dt>mail</dt><dd><a href="mailto:mail@vinpatel.org">mail@vinpatel.org</a></dd>
 <dt>github</dt><dd><a href="https://github.com/vinpate" rel="me">github.com/vinpate</a></dd>
 <dt>linkedin</dt><dd><a href="https://www.linkedin.com/in/vin-pate" rel="me">linkedin.com/in/vin-pate</a></dd>
-<dt>bluesky</dt><dd><a href="https://bsky.app/profile/vinfa.bsky.social" rel="me">bsky.app/profile/vinfa.bsky.social</a></dd>
-<dt>photos</dt><dd><a href="https://www.instagram.com/vinfral7" rel="me">instagram.com/vinfral7</a></dd>
+<dt>photography</dt><dd><a href="https://www.instagram.com/vinfral7" rel="me">instagram.com/vinfral7</a></dd>
 </dl>
 <p class="notice">The server behind this page is offline right now. Mail still works.</p>
 </main>

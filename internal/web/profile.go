@@ -40,8 +40,7 @@ var vin = profile{
 	Links: []link{
 		{"github", "github.com/vinpate", "https://github.com/vinpate"},
 		{"linkedin", "linkedin.com/in/vin-pate", "https://www.linkedin.com/in/vin-pate"},
-		{"bluesky", "bsky.app/profile/vinfa.bsky.social", "https://bsky.app/profile/vinfa.bsky.social"},
-		{"photos", "instagram.com/vinfral7", "https://www.instagram.com/vinfral7"},
+		{"photography", "instagram.com/vinfral7", "https://www.instagram.com/vinfral7"},
 	},
 }
 
