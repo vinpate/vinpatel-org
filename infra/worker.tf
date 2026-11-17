@@ -1,3 +1,13 @@
+# Workers Logs would keep a record of every request, which the README rules
+# out. New Workers get it switched on by default and the dashboard can switch
+# it back on, so both Workers declare it off and a plan shows any change.
+locals {
+  no_worker_logs = {
+    enabled = false
+    logs    = { enabled = false, invocation_logs = false }
+  }
+}
+
 resource "cloudflare_workers_script" "fallback" {
   account_id         = var.account_id
   script_name        = "vinpatel-org-fallback"
@@ -5,6 +15,7 @@ resource "cloudflare_workers_script" "fallback" {
   content_file       = "${path.module}/../edge/fallback.js"
   content_sha256     = filesha256("${path.module}/../edge/fallback.js")
   compatibility_date = "2026-10-01"
+  observability      = local.no_worker_logs
 }
 
 resource "cloudflare_workers_script_subdomain" "fallback" {
@@ -27,6 +38,7 @@ resource "cloudflare_workers_script" "mta_sts" {
   content_file       = "${path.module}/../edge/mta-sts.js"
   content_sha256     = filesha256("${path.module}/../edge/mta-sts.js")
   compatibility_date = "2026-10-01"
+  observability      = local.no_worker_logs
 
   bindings = [{
     name = "POLICY"
