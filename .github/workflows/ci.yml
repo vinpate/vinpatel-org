@@ -77,3 +77,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: v1.0.${{ github.run_number }}
         run: gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "$TAG" --notes "Built from $GITHUB_SHA."
+
+  # Every run on main, the weekly one included, reports to Honeybadger: a
+  # failure alerts at once, and a week and a day without a pass alerts too.
+  report:
+    needs: [test, build, release]
+    if: always() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - env:
+          HONEYBADGER_API_KEY: ${{ secrets.HONEYBADGER_API_KEY }}
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$FAILED" = true ]; then outcome=failure; else outcome=success; fi
+          scripts/report.sh "$outcome" ci-main "ci failed on main ($GITHUB_EVENT_NAME, ${GITHUB_SHA:0:7}): $RUN_URL"

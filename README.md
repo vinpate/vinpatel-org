@@ -39,6 +39,33 @@ An empty `DOH_URL` turns DNS lookups off, so the local page makes no mail
 claim. `scripts/build.sh` builds the release binaries into `dist/` as CI
 does, and `scripts/smoke.sh BINARY` runs CI's checks against a built server.
 
+## Watch
+
+Honeybadger checks the site every 5 minutes from Virginia, Frankfurt and
+Singapore, the way a mail server sees it: the page and the MTA-STS policy
+must answer, and `/trace` must report a confirmed verdict with every mail
+check matching `mail.json`. Every CI run on `main` reports too
+(`scripts/report.sh`): a pass reports the `ci-main` check-in, which alerts
+after a week and a day without one, and a failure alerts at once. CI needs
+one repository secret, `HONEYBADGER_API_KEY`, the project's API key.
+
+The monitors are set by hand in the `vinpatel.org` project, so this table is
+the record to compare them with. Each one runs every 5 minutes from
+Virginia, Frankfurt and Singapore, is down after 2 consecutive failures,
+validates TLS and times out after 10 seconds.
+
+| Monitor | URL | Up when |
+|---------|-----|---------|
+| page | `https://vinpatel.org/` | any 2xx |
+| mail-posture | `https://vinpatel.org/trace` | JMESPath: `` mail.verdict == `"confirmed"` && length(values(mail.checks)[?match != `true`]) == `0` `` |
+| mta-sts-policy | `https://mta-sts.vinpatel.org/.well-known/mta-sts.txt` | body includes `version: STSv1` |
+
+The `ci-main` check-in is a simple schedule: a report every 1 week, with a
+grace period of 1 day.
+
+`scripts/probe.sh` runs the same checks from wherever you are, right after a
+deploy or `make apply`, without waiting for the next check.
+
 ## Deploy
 
 Secrets stay in 1Password; `infra/op.env` holds only `op://` references.
