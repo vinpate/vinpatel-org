@@ -2,4 +2,5 @@
 go = "1.27.4"
 node = "24.21.0"
 terraform = "1.16.5"
-actionlint = "1.7.12"
+# Upstream's releases; mise's short name is deprecated for a fork.
+"aqua:rhysd/actionlint" = "1.7.12"
